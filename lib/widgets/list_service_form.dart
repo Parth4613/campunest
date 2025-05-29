@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme.dart';
 import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ListServiceForm extends StatefulWidget {
   const ListServiceForm({Key? key}) : super(key: key);
@@ -216,7 +217,11 @@ class _ListServiceFormState extends State<ListServiceForm>
 
   void _submitForm() async {
     // Prepare the data map based on your form fields and service type
+
+    final userId =
+        FirebaseAuth.instance.currentUser?.uid; // Get current user ID
     final data = {
+      'userId': userId,
       'serviceType': _serviceType,
       'serviceName': _serviceNameController.text,
       'location': _locationController.text,
@@ -298,10 +303,11 @@ class _ListServiceFormState extends State<ListServiceForm>
   Widget build(BuildContext context) {
     theme = Theme.of(context);
     scaffoldBg = theme.scaffoldBackgroundColor;
+    // Custom card color for better contrast
     cardColor =
         theme.brightness == Brightness.dark
             ? const Color(0xFF23262F)
-            : const Color(0xFFF7F8FA);
+            : const Color.fromARGB(255, 226, 227, 231);
     textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
     textSecondary =
         theme.textTheme.bodyMedium?.color?.withOpacity(0.7) ?? Colors.black54;
@@ -1448,7 +1454,13 @@ class _ListServiceFormState extends State<ListServiceForm>
               decoration: BoxDecoration(
                 color: cardColor,
                 borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
-                border: Border.all(color: BuddyTheme.borderColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: TextFormField(
                 controller: controller,

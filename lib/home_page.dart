@@ -7,6 +7,7 @@ import 'widgets/action_sheet.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 export 'profile_page.dart';
 export 'need_room_page.dart';
@@ -61,6 +62,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final navBarColor =
+        isDark
+            ? const Color(0xFF23262F) // Custom dark shade for nav bar
+            : const Color(0xFFF5F6FA); // Custom light shade for nav bar
+    final navBarIconColor =
+        isDark ? Colors.white : BuddyTheme.textSecondaryColor;
+    final navBarSelectedColor = BuddyTheme.primaryColor;
+
     return Scaffold(
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
@@ -91,30 +102,50 @@ class _HomeScreenState extends State<HomeScreen> {
         notchMargin: BuddyTheme.spacingSm,
         elevation: BuddyTheme.elevationMd,
         padding: EdgeInsets.zero,
-        color: BuddyTheme.backgroundSecondaryColor,
+        color: navBarColor,
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.black26,
         shape: const CircularNotchedRectangle(),
+        clipBehavior: Clip.antiAlias,
         child: Container(
           height: 60,
           padding: const EdgeInsets.symmetric(horizontal: BuddyTheme.spacingSm),
           child: Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceEvenly, // Evenly space all nav items
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildNavItem(0, Icons.home_outlined, Icons.home, 'Home'),
-              _buildNavItem(1, Icons.hotel_outlined, Icons.hotel, 'Need\nRoom'),
-              if (_selectedIndex == 0)
-                const SizedBox(
-                  width: 56,
-                ), // Reserve space for FAB (56 is default FAB diameter)
+              _buildNavItem(
+                0,
+                Icons.home_outlined,
+                Icons.home,
+                'Home',
+                navBarIconColor,
+                navBarSelectedColor,
+              ),
+              _buildNavItem(
+                1,
+                Icons.hotel_outlined,
+                Icons.hotel,
+                'Need\nRoom',
+                navBarIconColor,
+                navBarSelectedColor,
+              ),
+              if (_selectedIndex == 0) const SizedBox(width: 56),
               _buildNavItem(
                 2,
                 Icons.group_outlined,
                 Icons.group,
                 'Need\nFlatmate',
+                navBarIconColor,
+                navBarSelectedColor,
               ),
-              _buildNavItem(3, Icons.person_outline, Icons.person, 'Profile'),
+              _buildNavItem(
+                3,
+                Icons.person_outline,
+                Icons.person,
+                'Profile',
+                navBarIconColor,
+                navBarSelectedColor,
+              ),
             ],
           ),
         ),
@@ -127,6 +158,8 @@ class _HomeScreenState extends State<HomeScreen> {
     IconData icon,
     IconData activeIcon,
     String label,
+    Color iconColor,
+    Color selectedColor,
   ) {
     final isSelected = _selectedIndex == index;
     return InkWell(
@@ -139,10 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Icon(
                 isSelected ? activeIcon : icon,
-                color:
-                    isSelected
-                        ? BuddyTheme.primaryColor
-                        : BuddyTheme.textSecondaryColor,
+                color: isSelected ? selectedColor : iconColor,
                 size: BuddyTheme.iconSizeMd,
               ),
             ],
@@ -154,10 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall!.copyWith(
-              color:
-                  isSelected
-                      ? BuddyTheme.primaryColor
-                      : BuddyTheme.textSecondaryColor,
+              color: isSelected ? selectedColor : iconColor,
               fontSize: BuddyTheme.fontSizeXs,
               height: 1.1,
             ),
@@ -186,6 +213,45 @@ class _HomePageState extends State<HomePage>
   void initState() {
     super.initState();
     _loadUserName();
+    _fetchFeaturedProperties();
+    _fetchFeaturedFlatmates();
+  }
+
+  Future<void> _fetchFeaturedProperties() async {
+    final ref = FirebaseDatabase.instance.ref().child('room_listings');
+    final snapshot = await ref.get();
+    final List<Map<dynamic, dynamic>> properties = [];
+    if (snapshot.exists) {
+      final data = snapshot.value as Map<dynamic, dynamic>;
+      data.forEach((key, value) {
+        final property = Map<String, dynamic>.from(value as Map);
+        property['key'] = key;
+        properties.add(property);
+      });
+    }
+    setState(() {
+      _featuredProperties =
+          properties.take(5).toList(); // Show top 5, or filter as needed
+      _isLoadingProperties = false;
+    });
+  }
+
+  Future<void> _fetchFeaturedFlatmates() async {
+    final ref = FirebaseDatabase.instance.ref().child('room_requests');
+    final snapshot = await ref.get();
+    final List<Map<dynamic, dynamic>> flatmates = [];
+    if (snapshot.exists) {
+      final data = snapshot.value as Map<dynamic, dynamic>;
+      data.forEach((key, value) {
+        final flatmate = Map<String, dynamic>.from(value as Map);
+        flatmate['key'] = key;
+        flatmates.add(flatmate);
+      });
+    }
+    setState(() {
+      _featuredFlatmates = flatmates.take(5).toList(); // Show top 5
+      _isLoadingFlatmates = false;
+    });
   }
 
   Future<void> _loadUserName() async {
@@ -248,49 +314,24 @@ class _HomePageState extends State<HomePage>
                   const SizedBox(height: BuddyTheme.spacingSm),
                   SizedBox(
                     height: 270,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        _buildPropertyCard(
-                          context,
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
-                          title: 'De Apartment',
-                          price: '\$267,000',
-                          location: '2BW NY, New York',
-                          size: '2000 sqft',
-                          bedCount: 4,
-                          bathCount: 3,
-                          kitchenCount: 1,
-                        ),
-                        const SizedBox(width: BuddyTheme.spacingSm),
-                        _buildPropertyCard(
-                          context,
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1460518451285-97b6aa326961?auto=format&fit=crop&w=400&q=80',
-                          title: 'Urban Flat',
-                          price: '\$320,000',
-                          location: '5th Ave, NY, New York',
-                          size: '1800 sqft',
-                          bedCount: 3,
-                          bathCount: 2,
-                          kitchenCount: 1,
-                        ),
-                        const SizedBox(width: BuddyTheme.spacingSm),
-                        _buildPropertyCard(
-                          context,
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=400&q=80',
-                          title: 'Lake House',
-                          price: '\$450,000',
-                          location: 'Lakeview, Chicago',
-                          size: '2500 sqft',
-                          bedCount: 5,
-                          bathCount: 4,
-                          kitchenCount: 2,
-                        ),
-                      ],
-                    ),
+                    child:
+                        _isLoadingProperties
+                            ? const Center(child: CircularProgressIndicator())
+                            : ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _featuredProperties.length,
+                              separatorBuilder:
+                                  (context, index) => const SizedBox(
+                                    width: BuddyTheme.spacingSm,
+                                  ),
+                              itemBuilder: (context, index) {
+                                final property = _featuredProperties[index];
+                                return _buildPropertyCard(
+                                  context,
+                                  property as Map<String, dynamic>,
+                                );
+                              },
+                            ),
                   ),
                   const SizedBox(height: BuddyTheme.spacingMd),
 
@@ -303,34 +344,32 @@ class _HomePageState extends State<HomePage>
                   const SizedBox(height: BuddyTheme.spacingSm),
                   SizedBox(
                     height: 180,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        _buildFlatmateCard(
-                          context,
-                          imageUrl:
-                              'https://randomuser.me/api/portraits/men/32.jpg',
-                          name: 'Alex Johnson',
-                          profession: 'Software Engineer',
-                        ),
-                        const SizedBox(width: BuddyTheme.spacingSm),
-                        _buildFlatmateCard(
-                          context,
-                          imageUrl:
-                              'https://randomuser.me/api/portraits/women/44.jpg',
-                          name: 'Priya Sharma',
-                          profession: 'Designer',
-                        ),
-                        const SizedBox(width: BuddyTheme.spacingSm),
-                        _buildFlatmateCard(
-                          context,
-                          imageUrl:
-                              'https://randomuser.me/api/portraits/men/65.jpg',
-                          name: 'Rahul Mehra',
-                          profession: 'Student',
-                        ),
-                      ],
-                    ),
+                    child:
+                        _isLoadingFlatmates
+                            ? const Center(child: CircularProgressIndicator())
+                            : ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _featuredFlatmates.length,
+                              separatorBuilder:
+                                  (context, index) => const SizedBox(
+                                    width: BuddyTheme.spacingSm,
+                                  ),
+                              itemBuilder: (context, index) {
+                                final flatmate = _featuredFlatmates[index];
+                                return _buildFlatmateCard(
+                                  context,
+                                  imageUrl:
+                                      flatmate['photoUrl'] ??
+                                      'https://randomuser.me/api/portraits/men/32.jpg',
+                                  name: flatmate['name'] ?? 'No Name',
+                                  age: flatmate['age']?.toString() ?? '',
+                                  profession:
+                                      flatmate['occupation'] ??
+                                      flatmate['about'] ??
+                                      '',
+                                );
+                              },
+                            ),
                   ),
 
                   const SizedBox(height: BuddyTheme.spacingMd),
@@ -347,43 +386,34 @@ class _HomePageState extends State<HomePage>
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: [
-                        _buildPropertyCard(
+                        _buildHostelCard(
                           context,
                           imageUrl:
                               'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80',
                           title: 'Sunrise Hostel',
                           price: '\$120/mo',
                           location: 'Downtown, NY',
-                          size: 'Shared',
-                          bedCount: 2,
-                          bathCount: 1,
-                          kitchenCount: 1,
+                          type: 'Shared',
                         ),
                         const SizedBox(width: BuddyTheme.spacingSm),
-                        _buildPropertyCard(
+                        _buildHostelCard(
                           context,
                           imageUrl:
                               'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80',
                           title: 'Sunset PG',
                           price: '\$150/mo',
                           location: 'Uptown, NY',
-                          size: 'Private',
-                          bedCount: 1,
-                          bathCount: 1,
-                          kitchenCount: 1,
+                          type: 'Private',
                         ),
                         const SizedBox(width: BuddyTheme.spacingSm),
-                        _buildPropertyCard(
+                        _buildHostelCard(
                           context,
                           imageUrl:
                               'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80',
                           title: 'Moonlight Hostel',
                           price: '\$100/mo',
                           location: 'Midtown, NY',
-                          size: 'Shared',
-                          bedCount: 2,
-                          bathCount: 1,
-                          kitchenCount: 1,
+                          type: 'Shared',
                         ),
                       ],
                     ),
@@ -528,141 +558,269 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildPropertyCard(
-    BuildContext context, {
-    required String imageUrl,
-    required String title,
-    required String price,
-    required String location,
-    required String size,
-    required int bedCount,
-    required int bathCount,
-    required int kitchenCount,
-  }) {
+    BuildContext context,
+    Map<String, dynamic> property,
+  ) {
+    // Helper function to format currency
+    String formatPrice(String price) {
+      if (price.isEmpty) return '';
+      final amount = int.tryParse(price) ?? 0;
+      return '₹${(amount / 1000).toStringAsFixed(0)}K/month';
+    }
+
+    // Helper function to format date
+    String formatAvailableDate(String? dateString) {
+      if (dateString == null || dateString.isEmpty) return 'Immediate';
+      try {
+        final date = DateTime.parse(dateString);
+        final now = DateTime.now();
+        final difference = date.difference(now).inDays;
+
+        if (difference <= 0) return 'Available Now';
+        if (difference <= 7) return 'This Week';
+        if (difference <= 30) return 'This Month';
+        return '${date.day}/${date.month}';
+      } catch (e) {
+        return 'Available';
+      }
+    }
+
+    // Helper function to get short furnishing
+    String getShortFurnishing(String furnishing) {
+      if (furnishing.toLowerCase().contains('full')) return 'Fully Furnished';
+      if (furnishing.toLowerCase().contains('semi')) return 'Semi Furnished';
+      if (furnishing.toLowerCase().contains('un')) return 'Unfurnished';
+      return furnishing;
+    }
+
     return AnimatedOpacity(
       opacity: 1.0,
       duration: const Duration(milliseconds: 500),
       child: Container(
-        width: 255,
+        width: 240, // More compact width
         decoration: BuddyTheme.featuredCardDecoration,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(BuddyTheme.borderRadiusMd),
-                topRight: Radius.circular(BuddyTheme.borderRadiusMd),
-              ),
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                height: 150,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                placeholder:
-                    (context, url) => Shimmer.fromColors(
-                      baseColor: BuddyTheme.backgroundSecondaryColor,
-                      highlightColor: BuddyTheme.backgroundPrimaryColor,
-                      child: Container(
-                        color: BuddyTheme.backgroundSecondaryColor,
+            // Image Section with Status Badge
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(BuddyTheme.borderRadiusMd),
+                    topRight: Radius.circular(BuddyTheme.borderRadiusMd),
+                  ),
+                  child: CachedNetworkImage(
+                    imageUrl:
+                        property['imageUrl'] ??
+                        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
+                    height: 110, // Slightly reduced height
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder:
+                        (context, url) => Shimmer.fromColors(
+                          baseColor: BuddyTheme.backgroundSecondaryColor,
+                          highlightColor: BuddyTheme.backgroundPrimaryColor,
+                          child: Container(
+                            height: 110,
+                            color: BuddyTheme.backgroundSecondaryColor,
+                            child: const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        ),
+                    errorWidget:
+                        (context, url, error) => Container(
+                          height: 110,
+                          color: Colors.grey[300],
+                          child: const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.broken_image,
+                                size: 40,
+                                color: Colors.grey,
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Image not available',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                  ),
+                ),
+                // Available Status Badge
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Available',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                errorWidget:
-                    (context, url, error) => Icon(
-                      Icons.broken_image,
-                      color: BuddyTheme.textSecondaryColor,
-                      size: BuddyTheme.iconSizeLg,
+                  ),
+                ),
+                // Room Type Badge
+                Positioned(
+                  bottom: 6,
+                  left: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
                     ),
-              ),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '${property['roomType'] ?? ''} • ${property['flatSize'] ?? ''}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
+
             Padding(
-              padding: const EdgeInsets.all(BuddyTheme.spacingSm),
+              padding: const EdgeInsets.all(10), // Slightly reduced padding
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.titleLarge!.copyWith(
-                            color:
-                                BuddyTheme
-                                    .textPrimaryColor, // <-- Set to a visible color
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Text(
-                        price,
-                        style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                          color: BuddyTheme.accentColor,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  // Title
+                  Text(
+                    property['title'] ?? 'Property Title',
+                    style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                      color: BuddyTheme.textPrimaryColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: BuddyTheme.spacingXs),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        color: BuddyTheme.textSecondaryColor,
-                        size: BuddyTheme.iconSizeSm,
-                      ),
-                      const SizedBox(width: BuddyTheme.spacingXxs),
-                      Expanded(
-                        child: Text(
-                          location,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.bodySmall!.copyWith(
-                            color:
-                                BuddyTheme
-                                    .textSecondaryColor, // <-- Set to a visible color
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: BuddyTheme.spacingXs),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: BuddyTheme.spacingXs,
-                          vertical: BuddyTheme.spacingXxs,
-                        ),
-                        decoration: BuddyTheme.roomAvailableTagDecoration,
-                        child: Text(
-                          size,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.bodySmall!.copyWith(
-                            color:
-                                BuddyTheme
-                                    .textLightColor, // <-- Ensure contrast
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 2),
+
+                  // Location
+                  Text(
+                    property['location'] ?? 'Location',
+                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                      color: BuddyTheme.textSecondaryColor,
+                      fontSize: 11,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: BuddyTheme.spacingSm),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  const SizedBox(height: 4),
+
+                  // Price
+                  Text(
+                    formatPrice(property['rent'] ?? ''),
+                    style: Theme.of(context).textTheme.titleMedium!.copyWith(
+                      color: BuddyTheme.accentColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+
+                  // First Row of Info Chips
+                  Wrap(
+                    spacing: 3,
+                    runSpacing: 2,
                     children: [
-                      _buildFeatureChip(context, Icons.bed, '$bedCount Bed'),
-                      _buildFeatureChip(
+                      _buildInfoChip(
                         context,
-                        Icons.bathtub,
-                        '$bathCount Bath',
+                        Icons.chair,
+                        getShortFurnishing(property['furnishing'] ?? ''),
                       ),
-                      _buildFeatureChip(
+                      _buildInfoChip(
                         context,
-                        Icons.kitchen,
-                        '$kitchenCount Kitchen',
+                        Icons.calendar_today,
+                        formatAvailableDate(property['availableFromDate']),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 3),
+
+                  // Second Row of Info Chips
+                  Wrap(
+                    spacing: 3,
+                    runSpacing: 2,
+                    children: [
+                      if (property['genderComposition'] != null &&
+                          property['genderComposition'].toString().isNotEmpty)
+                        _buildInfoChip(
+                          context,
+                          Icons.wc,
+                          property['genderComposition'],
+                        ),
+                      if (property['occupation'] != null &&
+                          property['occupation'].toString().isNotEmpty)
+                        _buildInfoChip(
+                          context,
+                          Icons.work,
+                          property['occupation'],
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+
+                  // Flatmates Info
+                  if (property['currentFlatmates'] != null &&
+                      property['maxFlatmates'] != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: BuddyTheme.backgroundSecondaryColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.people_outline,
+                            size: 12,
+                            color: BuddyTheme.textSecondaryColor,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${property['currentFlatmates']}/${property['maxFlatmates']} flatmates',
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodySmall!.copyWith(
+                              color: BuddyTheme.textSecondaryColor,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -672,28 +830,30 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildFeatureChip(BuildContext context, IconData icon, String text) {
+  // Enhanced info chip with better styling
+  Widget _buildInfoChip(BuildContext context, IconData icon, String text) {
+    if (text.isEmpty) return const SizedBox.shrink();
+
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: BuddyTheme.spacingXs,
-        vertical: BuddyTheme.spacingXxs,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: BuddyTheme.backgroundSecondaryColor,
-        borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusXs),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: BuddyTheme.borderColor.withOpacity(0.3),
+          width: 0.5,
+        ),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            color: BuddyTheme.warningColor,
-            size: BuddyTheme.iconSizeSm,
-          ),
-          const SizedBox(width: BuddyTheme.spacingXxs),
+          Icon(icon, size: 12, color: BuddyTheme.textSecondaryColor),
+          const SizedBox(width: 2),
           Text(
             text,
             style: Theme.of(context).textTheme.bodySmall!.copyWith(
-              color: BuddyTheme.textPrimaryColor, // <-- Set to a visible color
+              color: BuddyTheme.textSecondaryColor,
+              fontSize: 10,
             ),
           ),
         ],
@@ -705,8 +865,8 @@ class _HomePageState extends State<HomePage>
     BuildContext context, {
     required String imageUrl,
     required String name,
+    required String age,
     required String profession,
-    bool verified = false,
     Color? cardColor,
     Color? labelColor,
   }) {
@@ -715,18 +875,13 @@ class _HomePageState extends State<HomePage>
     final Color effectiveLabelColor = labelColor ?? BuddyTheme.textPrimaryColor;
 
     return Container(
-      margin: const EdgeInsets.symmetric(
-        horizontal: 6,
-        vertical: 4,
-      ), // Add margin for separation
+      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            BuddyTheme.primaryColor.withOpacity(
-              0.12,
-            ), // Slightly stronger gradient
+            BuddyTheme.primaryColor.withOpacity(0.12),
             BuddyTheme.accentColor.withOpacity(0.10),
           ],
         ),
@@ -734,7 +889,7 @@ class _HomePageState extends State<HomePage>
         border: Border.all(
           color: BuddyTheme.primaryColor.withOpacity(0.25),
           width: 1.2,
-        ), // More visible border
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
@@ -743,73 +898,71 @@ class _HomePageState extends State<HomePage>
           ),
         ],
       ),
-      width: 120, // Slightly wider for better content fit
+      width: 130,
       padding: const EdgeInsets.all(BuddyTheme.spacingMd),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 32,
-                backgroundColor: Colors.white,
-                child: ClipOval(
-                  child: CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    fit: BoxFit.cover,
-                    width: 64,
-                    height: 64,
-                    placeholder:
-                        (context, url) => Shimmer.fromColors(
-                          baseColor: effectiveCardColor,
-                          highlightColor: BuddyTheme.backgroundPrimaryColor,
-                          child: Container(color: effectiveCardColor),
-                        ),
-                    errorWidget:
-                        (context, url, error) => Icon(
-                          Icons.person,
-                          color: effectiveLabelColor,
-                          size: BuddyTheme.iconSizeMd,
-                        ),
-                  ),
-                ),
+          CircleAvatar(
+            radius: 32,
+            backgroundColor: Colors.white,
+            child: ClipOval(
+              child: CachedNetworkImage(
+                imageUrl: imageUrl,
+                fit: BoxFit.cover,
+                width: 64,
+                height: 64,
+                placeholder:
+                    (context, url) => Shimmer.fromColors(
+                      baseColor: effectiveCardColor,
+                      highlightColor: BuddyTheme.backgroundPrimaryColor,
+                      child: Container(color: effectiveCardColor),
+                    ),
+                errorWidget:
+                    (context, url, error) => Icon(
+                      Icons.person,
+                      color: effectiveLabelColor,
+                      size: BuddyTheme.iconSizeMd,
+                    ),
               ),
-              if (verified)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: BuddyTheme.successColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.verified,
-                      color: BuddyTheme.textLightColor,
-                      size: BuddyTheme.iconSizeSm,
-                    ),
-                  ),
-                ),
-            ],
+            ),
           ),
           const SizedBox(height: BuddyTheme.spacingXs),
           Text(
             name,
             style: Theme.of(context).textTheme.titleMedium!.copyWith(
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
               color: effectiveLabelColor,
+              fontSize: 16,
+              letterSpacing: 0.1,
             ),
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
+          if (age.isNotEmpty)
+            Text(
+              'Age: $age',
+              style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                color: effectiveLabelColor.withOpacity(0.7),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
           Text(
-            profession,
-            style: Theme.of(context).textTheme.bodySmall!.copyWith(
-              color: effectiveLabelColor.withOpacity(0.7),
+            profession.isNotEmpty ? profession : '—',
+            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+              color: BuddyTheme.accentColor,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              letterSpacing: 0.1,
             ),
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
+            maxLines: 2,
           ),
         ],
       ),
@@ -887,4 +1040,128 @@ class _HomePageState extends State<HomePage>
       ),
     );
   }
+
+  Widget _buildHostelCard(
+    BuildContext context, {
+    required String imageUrl,
+    required String title,
+    required String price,
+    required String location,
+    required String type, // e.g. "Shared", "Private", "PG", etc.
+  }) {
+    return AnimatedOpacity(
+      opacity: 1.0,
+      duration: const Duration(milliseconds: 500),
+      child: Container(
+        width: 255,
+        decoration: BuddyTheme.featuredCardDecoration,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(BuddyTheme.borderRadiusMd),
+                topRight: Radius.circular(BuddyTheme.borderRadiusMd),
+              ),
+              child: CachedNetworkImage(
+                imageUrl: imageUrl,
+                height: 150,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                placeholder:
+                    (context, url) => Shimmer.fromColors(
+                      baseColor: BuddyTheme.backgroundSecondaryColor,
+                      highlightColor: BuddyTheme.backgroundPrimaryColor,
+                      child: Container(
+                        color: BuddyTheme.backgroundSecondaryColor,
+                      ),
+                    ),
+                errorWidget:
+                    (context, url, error) => Container(
+                      color: Colors.grey[300],
+                      child: const Icon(
+                        Icons.broken_image,
+                        size: 60,
+                        color: Colors.grey,
+                      ),
+                    ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(BuddyTheme.spacingSm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: Theme.of(context).textTheme.titleLarge!
+                              .copyWith(color: BuddyTheme.textPrimaryColor),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        price,
+                        style: Theme.of(context).textTheme.titleLarge!.copyWith(
+                          color: BuddyTheme.accentColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: BuddyTheme.spacingXs),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        color: BuddyTheme.textSecondaryColor,
+                        size: BuddyTheme.iconSizeSm,
+                      ),
+                      const SizedBox(width: BuddyTheme.spacingXxs),
+                      Expanded(
+                        child: Text(
+                          location,
+                          style: Theme.of(context).textTheme.bodySmall!
+                              .copyWith(color: BuddyTheme.textSecondaryColor),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: BuddyTheme.spacingSm),
+                  _buildInfoChip(context, Icons.meeting_room, type),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
+class PropertyData {
+  final String imageUrl;
+  // ... other fields
+
+  PropertyData({
+    required this.imageUrl,
+    // ... other fields
+  });
+
+  factory PropertyData.fromJson(Map<String, dynamic> json) {
+    return PropertyData(
+      imageUrl: json['imageUrl'] ?? '',
+      // ... other fields
+    );
+  }
+}
+
+List<Map<dynamic, dynamic>> _featuredProperties = [];
+bool _isLoadingProperties = true;
+
+List<Map<dynamic, dynamic>> _featuredFlatmates = [];
+bool _isLoadingFlatmates = true;

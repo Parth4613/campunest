@@ -7,8 +7,15 @@ import 'theme.dart';
 import 'home_page.dart';
 import 'Hostelpg_page.dart';
 import 'service_page.dart';
+import 'display pages/property_details.dart';
 import './display pages/property_details.dart' as property_details;
 import './display pages/flatmate_details.dart';
+import 'edit_profile.dart';
+import 'my_listings.dart';
+
+
+// Add RouteObserver
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +34,7 @@ class BuddyApp extends StatelessWidget {
       darkTheme: BuddyTheme.darkTheme,
       themeMode: ThemeMode.system, // Use system theme by default
       debugShowCheckedModeBanner: false,
+      navigatorObservers: [routeObserver], // Add route observer
       home: AuthStateHandler(),
       routes: {
         '/login': (context) => const LoginPage(),
@@ -34,9 +42,13 @@ class BuddyApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/hostelpg': (context) => const HostelPgPage(),
         '/services': (context) => const ServicesPage(),
-        '/propertyDetails':
-            (context) =>
-                const property_details.PropertyDetailsPage(propertyKey: ''),
+        '/editProfile': (context) => const EditProfilePage(),
+        '/myListings': (context) => const MyListingsPage(),
+        '/propertyDetails': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final propertyId = args?['propertyId'] as String? ?? '';
+          return PropertyDetailsScreen(propertyId: propertyId);
+        },
         // '/flatmateDetails': (context) => const FlatmateDetailsPage(),
       },
     );

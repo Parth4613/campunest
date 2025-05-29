@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'theme.dart';
+import 'display pages/flatmate_details.dart';
 
 class NeedFlatmatePage extends StatefulWidget {
   const NeedFlatmatePage({super.key});
@@ -12,6 +13,8 @@ class NeedFlatmatePage extends StatefulWidget {
 }
 
 class _NeedFlatmatePageState extends State<NeedFlatmatePage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
   String _selectedLocation = 'All Cities';
   String _selectedAge = 'All Ages';
   String _selectedProfession = 'All Professions';
@@ -105,17 +108,9 @@ class _NeedFlatmatePageState extends State<NeedFlatmatePage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color accentColor =
-        isDark ? const Color(0xFF64B5F6) : const Color(0xFF4299E1);
     final Color cardColor = isDark ? const Color(0xFF23262F) : Colors.white;
     final Color textPrimary = isDark ? Colors.white : const Color(0xFF2D3748);
-    final Color textSecondary =
-        isDark ? Colors.white70 : const Color(0xFF718096);
     final Color borderColor = isDark ? Colors.white12 : const Color(0xFFE2E8F0);
-    final Color successColor =
-        isDark ? const Color(0xFF81C784) : const Color(0xFF48BB78);
-    final Color warningColor =
-        isDark ? const Color(0xFFFFB74D) : const Color(0xFFED8936);
     final Color inputFillColor =
         isDark ? const Color(0xFF23262F) : const Color(0xFFF1F5F9);
     final Color labelColor = textPrimary;
@@ -143,17 +138,6 @@ class _NeedFlatmatePageState extends State<NeedFlatmatePage> {
                   labelColor,
                   hintColor,
                   borderColor,
-                ),
-                const SizedBox(height: BuddyTheme.spacingMd),
-                _buildQuickStats(
-                  context,
-                  cardColor,
-                  labelColor,
-                  accentColor,
-                  textSecondary,
-                  borderColor,
-                  successColor,
-                  warningColor,
                 ),
                 const SizedBox(height: BuddyTheme.spacingMd),
                 _buildSectionHeader(
@@ -211,17 +195,28 @@ class _NeedFlatmatePageState extends State<NeedFlatmatePage> {
             border: Border.all(color: borderColor),
           ),
           child: TextField(
+            controller: _searchController,
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+              });
+            },
             style: TextStyle(color: labelColor),
             decoration: InputDecoration(
               hintText: 'Search by name, interests, profession...',
-              hintStyle: TextStyle(color: hintColor),
-              prefixIcon: Icon(Icons.search, color: labelColor),
+              hintStyle: TextStyle(
+                color: labelColor,
+              ), // Updated to use labelColor instead of hintColor
+              prefixIcon: Icon(
+                Icons.search,
+                color: Colors.grey,
+              ), // Updated to use grey color
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(BuddyTheme.spacingMd),
             ),
           ),
         ),
-        const SizedBox(height: BuddyTheme.spacingSm),
+        const SizedBox(height: 16),
         // Filter chips
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -332,81 +327,6 @@ class _NeedFlatmatePageState extends State<NeedFlatmatePage> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildQuickStats(
-    BuildContext context,
-    Color cardColor,
-    Color labelColor,
-    Color accentColor,
-    Color textSecondary,
-    Color borderColor,
-    Color successColor,
-    Color warningColor,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(BuddyTheme.spacingMd),
-      decoration: BuddyTheme.cardDecoration.copyWith(color: cardColor),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildStatItem(
-            context,
-            '247',
-            'Active\nFlatmates',
-            accentColor,
-            textSecondary,
-          ),
-          Container(width: 1, height: 40, color: borderColor),
-          _buildStatItem(
-            context,
-            '89',
-            'New This\nWeek',
-            successColor,
-            textSecondary,
-          ),
-          Container(width: 1, height: 40, color: borderColor),
-          _buildStatItem(
-            context,
-            '156',
-            'Verified\nProfiles',
-            warningColor,
-            textSecondary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(
-    BuildContext context,
-    String number,
-    String label,
-    Color color,
-    Color labelColor,
-  ) {
-    return Column(
-      children: [
-        Text(
-          number,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: labelColor.withOpacity(0.7),
-            fontWeight: FontWeight.w500,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
     );
   }
 
@@ -607,16 +527,18 @@ class _NeedFlatmatePageState extends State<NeedFlatmatePage> {
               ],
             ),
             const SizedBox(height: BuddyTheme.spacingMd),
-            // Bio
-            Text(
-              flatmate['bio'] ?? '',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium!.copyWith(color: labelColor),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: BuddyTheme.spacingSm),
+            // Bio only if available
+            if (flatmate['bio']?.isNotEmpty ?? false) ...[
+              Text(
+                flatmate['bio']!,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium!.copyWith(color: labelColor),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: BuddyTheme.spacingSm),
+            ],
             // Interests (if you store them as a list)
             if (flatmate['interests'] != null)
               Column(
@@ -667,28 +589,59 @@ class _NeedFlatmatePageState extends State<NeedFlatmatePage> {
                             )
                             .toList(),
                   ),
+                  const SizedBox(height: BuddyTheme.spacingMd),
                 ],
               ),
-            // ...add more fields as needed...
+            // View Detail Button
+            const SizedBox(height: BuddyTheme.spacingSm),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _viewFlatmateDetails(flatmate),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: BuddyTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: BuddyTheme.spacingSm,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      BuddyTheme.borderRadiusSm,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.visibility,
+                      size: BuddyTheme.iconSizeSm,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: BuddyTheme.spacingXs),
+                    Text(
+                      'View Details',
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Color _getCompatibilityColor(int compatibility) {
-    if (compatibility >= 90) return BuddyTheme.successColor;
-    if (compatibility >= 80) return BuddyTheme.primaryColor;
-    if (compatibility >= 70) return BuddyTheme.warningColor;
-    return Colors.redAccent; // fallback for error
-  }
-
-  void _toggleFavorite(String flatmateName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Added $flatmateName to favorites!'),
-        backgroundColor: BuddyTheme.successColor,
-        duration: const Duration(seconds: 2),
+  void _viewFlatmateDetails(Map<String, dynamic> flatmate) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FlatmateDetailsPage(flatmateData: flatmate),
       ),
     );
   }

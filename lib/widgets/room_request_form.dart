@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../theme.dart';
 
 class RoomRequestForm extends StatefulWidget {
@@ -172,7 +173,10 @@ class _RoomRequestFormState extends State<RoomRequestForm>
   void _submitForm() async {
     if (_formKey.currentState?.validate() ?? false) {
       // Prepare data to store in Firebase
+      final userId =
+          FirebaseAuth.instance.currentUser?.uid; // Get current user ID
       final data = {
+        'userId': userId ?? 'anonymous', // Use anonymous if not logged in
         'name': _nameController.text,
         'age': _ageController.text,
         'gender': _gender,
@@ -229,18 +233,11 @@ class _RoomRequestFormState extends State<RoomRequestForm>
   Widget build(BuildContext context) {
     theme = Theme.of(context);
     scaffoldBg = theme.scaffoldBackgroundColor;
-
     // Custom card color for better contrast
     cardColor =
         theme.brightness == Brightness.dark
-            ? const Color(0xFF23262F) // a bit lighter than pure black
-            : const Color.fromARGB(
-              255,
-              226,
-              227,
-              231,
-            ); // a bit darker than pure white
-
+            ? const Color(0xFF23262F)
+            : const Color.fromARGB(255, 226, 227, 231);
     textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
     textSecondary =
         theme.textTheme.bodyMedium?.color?.withOpacity(0.7) ?? Colors.black54;
@@ -252,7 +249,7 @@ class _RoomRequestFormState extends State<RoomRequestForm>
         backgroundColor: scaffoldBg,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.close, color: textPrimary),
+          icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
@@ -282,31 +279,28 @@ class _RoomRequestFormState extends State<RoomRequestForm>
           ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            _buildProgressIndicator(theme, textSecondary),
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _buildBasicInfoStep(),
-                  _buildRoomRequirementsStep(),
-                  _buildAdditionalPreferencesStep(),
-                  _buildContactDetailsStep(),
-                ],
-              ),
+      body: Column(
+        children: [
+          _buildProgressIndicator(),
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildBasicInfoStep(),
+                _buildRoomRequirementsStep(),
+                _buildAdditionalPreferencesStep(),
+                _buildContactDetailsStep(),
+              ],
             ),
-            _buildNavigationButtons(),
-          ],
-        ),
+          ),
+          _buildNavigationButtons(),
+        ],
       ),
     );
   }
 
-  Widget _buildProgressIndicator(ThemeData theme, Color textSecondary) {
+  Widget _buildProgressIndicator() {
     return Container(
       padding: const EdgeInsets.all(BuddyTheme.spacingLg),
       child: Column(
@@ -316,8 +310,8 @@ class _RoomRequestFormState extends State<RoomRequestForm>
             children: [
               Text(
                 'Step ${_currentStep + 1} of $_totalSteps',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: textSecondary,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: BuddyTheme.textSecondaryColor,
                 ),
               ),
               AnimatedBuilder(
@@ -325,7 +319,7 @@ class _RoomRequestFormState extends State<RoomRequestForm>
                 builder: (context, child) {
                   return Text(
                     '${((_currentStep + _progressAnimation.value) / _totalSteps * 100).round()}%',
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: BuddyTheme.primaryColor,
                       fontWeight: FontWeight.bold,
                     ),
@@ -340,7 +334,7 @@ class _RoomRequestFormState extends State<RoomRequestForm>
             builder: (context, child) {
               return LinearProgressIndicator(
                 value: (_currentStep + _progressAnimation.value) / _totalSteps,
-                backgroundColor: theme.dividerColor,
+                backgroundColor: BuddyTheme.dividerColor,
                 valueColor: AlwaysStoppedAnimation<Color>(
                   BuddyTheme.primaryColor,
                 ),
@@ -436,28 +430,22 @@ class _RoomRequestFormState extends State<RoomRequestForm>
 
             const SizedBox(height: BuddyTheme.spacingLg),
 
-            Row(
-              children: [
-                Expanded(
-                  child: _buildAnimatedTextField(
-                    controller: _minBudgetController,
-                    label: 'Min Budget (₹)',
-                    hint: 'Minimum',
-                    icon: Icons.currency_rupee,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: BuddyTheme.spacingMd),
-                Expanded(
-                  child: _buildAnimatedTextField(
-                    controller: _maxBudgetController,
-                    label: 'Max Budget (₹)',
-                    hint: 'Maximum',
-                    icon: Icons.currency_rupee,
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
+            _buildAnimatedTextField(
+              controller: _minBudgetController,
+              label: 'Min Budget (₹)',
+              hint: 'Minimum',
+              icon: Icons.currency_rupee,
+              keyboardType: TextInputType.number,
+            ),
+
+            const SizedBox(height: BuddyTheme.spacingLg),
+
+            _buildAnimatedTextField(
+              controller: _maxBudgetController,
+              label: 'Max Budget (₹)',
+              hint: 'Maximum',
+              icon: Icons.currency_rupee,
+              keyboardType: TextInputType.number,
             ),
 
             const SizedBox(height: BuddyTheme.spacingLg),
@@ -498,7 +486,7 @@ class _RoomRequestFormState extends State<RoomRequestForm>
             _buildSelectionCard(
               'Preferred Flatmate Gender',
               _preferredFlatmateGender,
-              ['Any', 'Male', 'Female', 'Other'],
+              ['Male Only', 'Female Only', 'Mixed'],
               (value) => setState(() => _preferredFlatmateGender = value),
               Icons.people,
             ),
@@ -546,16 +534,6 @@ class _RoomRequestFormState extends State<RoomRequestForm>
               ['No', 'Yes', "Don't Mind"],
               (value) => setState(() => _drinkingPreference = value),
               Icons.local_bar_outlined,
-            ),
-
-            const SizedBox(height: BuddyTheme.spacingLg),
-
-            _buildSwitchCard(
-              'Internet Required',
-              'Do you need high-speed internet?',
-              _internetRequired,
-              (value) => setState(() => _internetRequired = value),
-              Icons.wifi,
             ),
 
             const SizedBox(height: BuddyTheme.spacingLg),
@@ -683,85 +661,97 @@ class _RoomRequestFormState extends State<RoomRequestForm>
     Function(String) onChanged,
     IconData icon,
   ) {
-    return Container(
-      padding: const EdgeInsets.all(BuddyTheme.spacingMd),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: BuddyTheme.primaryColor),
-              const SizedBox(width: BuddyTheme.spacingSm),
-              Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: textPrimary,
-                ),
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 600),
+      tween: Tween(begin: 0.0, end: 1.0),
+      builder: (context, value, child) {
+        return Transform.translate(
+          offset: Offset(50 * (1 - value), 0),
+          child: Opacity(
+            opacity: value,
+            child: Container(
+              padding: const EdgeInsets.all(BuddyTheme.spacingMd),
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: BuddyTheme.spacingMd),
-          Wrap(
-            spacing: BuddyTheme.spacingSm,
-            runSpacing: BuddyTheme.spacingSm,
-            children:
-                options
-                    .map(
-                      (option) => GestureDetector(
-                        onTap: () => onChanged(option),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: BuddyTheme.spacingMd,
-                            vertical: BuddyTheme.spacingSm,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                selectedValue == option
-                                    ? BuddyTheme.primaryColor
-                                    : theme.scaffoldBackgroundColor,
-                            borderRadius: BorderRadius.circular(
-                              BuddyTheme.borderRadiusSm,
-                            ),
-                            border: Border.all(
-                              color:
-                                  selectedValue == option
-                                      ? BuddyTheme.primaryColor
-                                      : theme.dividerColor,
-                            ),
-                          ),
-                          child: Text(
-                            option,
-                            style: TextStyle(
-                              color:
-                                  selectedValue == option
-                                      ? Colors.white
-                                      : textPrimary,
-                              fontWeight:
-                                  selectedValue == option
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                            ),
-                          ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(icon, color: BuddyTheme.primaryColor),
+                      const SizedBox(width: BuddyTheme.spacingSm),
+                      Text(
+                        title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: textPrimary,
                         ),
                       ),
-                    )
-                    .toList(),
+                    ],
+                  ),
+                  const SizedBox(height: BuddyTheme.spacingMd),
+                  Wrap(
+                    spacing: BuddyTheme.spacingSm,
+                    runSpacing: BuddyTheme.spacingSm,
+                    children:
+                        options
+                            .map(
+                              (option) => GestureDetector(
+                                onTap: () => onChanged(option),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: BuddyTheme.spacingMd,
+                                    vertical: BuddyTheme.spacingSm,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        selectedValue == option
+                                            ? BuddyTheme.primaryColor
+                                            : scaffoldBg,
+                                    borderRadius: BorderRadius.circular(
+                                      BuddyTheme.borderRadiusSm,
+                                    ),
+                                    border: Border.all(
+                                      color:
+                                          selectedValue == option
+                                              ? BuddyTheme.primaryColor
+                                              : BuddyTheme.borderColor,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    option,
+                                    style: TextStyle(
+                                      color:
+                                          selectedValue == option
+                                              ? Colors.white
+                                              : textPrimary,
+                                      fontWeight:
+                                          selectedValue == option
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

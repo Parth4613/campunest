@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme.dart';
 import '../models/room_type.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Add this import at the top
 
 class ListHostelForm extends StatefulWidget {
   ListHostelForm({Key? key}) : super(key: key) {
@@ -210,7 +211,10 @@ class _ListHostelFormState extends State<ListHostelForm>
 
   void _submitForm() async {
     // Prepare data to store in Firebase
+    final userId =
+        FirebaseAuth.instance.currentUser?.uid; // Get current user ID
     final data = {
+      'uid': userId,
       'title': _titleController.text,
       'hostelType': _hostelType,
       'hostelFor': _hostelFor,
@@ -279,10 +283,11 @@ class _ListHostelFormState extends State<ListHostelForm>
   Widget build(BuildContext context) {
     theme = Theme.of(context);
     scaffoldBg = theme.scaffoldBackgroundColor;
+    // Custom card color for better contrast
     cardColor =
         theme.brightness == Brightness.dark
             ? const Color(0xFF23262F)
-            : const Color(0xFFF7F8FA);
+            : const Color.fromARGB(255, 226, 227, 231);
     textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
     textSecondary =
         theme.textTheme.bodyMedium?.color?.withOpacity(0.7) ?? Colors.black54;
@@ -775,6 +780,7 @@ class _ListHostelFormState extends State<ListHostelForm>
                 controller: controller,
                 keyboardType: keyboardType,
                 maxLines: maxLines,
+                style: TextStyle(color: textPrimary),
                 decoration: InputDecoration(
                   labelText: label,
                   hintText: hint,
@@ -786,9 +792,8 @@ class _ListHostelFormState extends State<ListHostelForm>
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: cardColor, // <-- FIXED
+                  fillColor: cardColor,
                 ),
-                style: TextStyle(color: textPrimary), // <-- FIXED
               ),
             ),
           ),
@@ -837,7 +842,7 @@ class _ListHostelFormState extends State<ListHostelForm>
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: textPrimary,
-                        ), // <-- FIXED
+                        ),
                       ),
                     ],
                   ),
@@ -860,7 +865,7 @@ class _ListHostelFormState extends State<ListHostelForm>
                                     color:
                                         selectedValue == option
                                             ? BuddyTheme.primaryColor
-                                            : scaffoldBg, // <-- FIXED
+                                            : scaffoldBg,
                                     borderRadius: BorderRadius.circular(
                                       BuddyTheme.borderRadiusSm,
                                     ),
@@ -877,7 +882,7 @@ class _ListHostelFormState extends State<ListHostelForm>
                                       color:
                                           selectedValue == option
                                               ? Colors.white
-                                              : textPrimary, // <-- FIXED
+                                              : textPrimary,
                                       fontWeight:
                                           selectedValue == option
                                               ? FontWeight.w600
