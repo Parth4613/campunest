@@ -290,7 +290,6 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
     if (isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -358,8 +357,6 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
         isDark
             ? Color.alphaBlend(Colors.white.withOpacity(0.06), theme.cardColor)
             : Color.alphaBlend(Colors.black.withOpacity(0.04), theme.cardColor);
-    final textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
-    final textSecondary = theme.textTheme.bodyMedium?.color ?? Colors.black54;
 
     return SliverAppBar(
       expandedHeight: 300,

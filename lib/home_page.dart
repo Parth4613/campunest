@@ -1,3 +1,5 @@
+import 'package:buddy/display%20pages/flatmate_details.dart';
+import 'package:buddy/display%20pages/property_details.dart';
 import 'package:flutter/material.dart';
 import 'theme.dart';
 import 'profile_page.dart';
@@ -209,6 +211,9 @@ class _HomePageState extends State<HomePage>
   final ScrollController _scrollController = ScrollController();
   String _userName = '';
 
+  int notificationCount =
+      0; // TODO: Replace with actual notification count logic
+
   @override
   void initState() {
     super.initState();
@@ -313,7 +318,7 @@ class _HomePageState extends State<HomePage>
                   ),
                   const SizedBox(height: BuddyTheme.spacingSm),
                   SizedBox(
-                    height: 270,
+                    height: 287,
                     child:
                         _isLoadingProperties
                             ? const Center(child: CircularProgressIndicator())
@@ -329,44 +334,6 @@ class _HomePageState extends State<HomePage>
                                 return _buildPropertyCard(
                                   context,
                                   property as Map<String, dynamic>,
-                                );
-                              },
-                            ),
-                  ),
-                  const SizedBox(height: BuddyTheme.spacingMd),
-
-                  // Featured Flatmates
-                  _buildSectionHeader(
-                    context,
-                    'Featured Flatmates',
-                    () => widget.onTabChange?.call(2),
-                  ),
-                  const SizedBox(height: BuddyTheme.spacingSm),
-                  SizedBox(
-                    height: 180,
-                    child:
-                        _isLoadingFlatmates
-                            ? const Center(child: CircularProgressIndicator())
-                            : ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _featuredFlatmates.length,
-                              separatorBuilder:
-                                  (context, index) => const SizedBox(
-                                    width: BuddyTheme.spacingSm,
-                                  ),
-                              itemBuilder: (context, index) {
-                                final flatmate = _featuredFlatmates[index];
-                                return _buildFlatmateCard(
-                                  context,
-                                  imageUrl:
-                                      flatmate['photoUrl'] ??
-                                      'https://randomuser.me/api/portraits/men/32.jpg',
-                                  name: flatmate['name'] ?? 'No Name',
-                                  age: flatmate['age']?.toString() ?? '',
-                                  profession:
-                                      flatmate['occupation'] ??
-                                      flatmate['about'] ??
-                                      '',
                                 );
                               },
                             ),
@@ -459,6 +426,45 @@ class _HomePageState extends State<HomePage>
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: BuddyTheme.spacingMd),
+
+                  // Featured Flatmates
+                  _buildSectionHeader(
+                    context,
+                    'Featured Flatmates',
+                    () => widget.onTabChange?.call(2),
+                  ),
+                  const SizedBox(height: BuddyTheme.spacingSm),
+                  SizedBox(
+                    height: 180,
+                    child:
+                        _isLoadingFlatmates
+                            ? const Center(child: CircularProgressIndicator())
+                            : ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _featuredFlatmates.length,
+                              separatorBuilder:
+                                  (context, index) => const SizedBox(
+                                    width: BuddyTheme.spacingSm,
+                                  ),
+                              itemBuilder: (context, index) {
+                                final flatmate = _featuredFlatmates[index];
+                                return _buildFlatmateCard(
+                                  context,
+                                  imageUrl:
+                                      flatmate['photoUrl'] ??
+                                      'https://randomuser.me/api/portraits/men/32.jpg',
+                                  name: flatmate['name'] ?? 'No Name',
+                                  age: flatmate['age']?.toString() ?? '',
+                                  profession:
+                                      flatmate['occupation'] ??
+                                      flatmate['about'] ??
+                                      '',
+                                );
+                              },
+                            ),
+                  ),
                 ]),
               ),
             ),
@@ -469,64 +475,146 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Hello!',
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                color: BuddyTheme.textSecondaryColor,
-              ),
-            ),
-            Text(
-              _userName,
-              style: Theme.of(
-                context,
-              ).textTheme.displaySmall!.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        Stack(
-          alignment: Alignment.topRight,
-          children: [
-            Container(
-              width: BuddyTheme.iconSizeXl,
-              height: BuddyTheme.iconSizeXl,
-              decoration: BoxDecoration(
-                color: BuddyTheme.successColor.withOpacity(0.1),
-                shape: BoxShape.circle,
-                border: Border.all(color: BuddyTheme.borderColor, width: 1),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(
-                  BuddyTheme.borderRadiusCircular,
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Get the current user's avatar URL or use a placeholder
+    final user = FirebaseAuth.instance.currentUser;
+    final String? avatarUrl = user?.photoURL;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16.0,
+        vertical: 12.0,
+      ), // Added padding for overall header
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            // Use Expanded to prevent text overflow in the Column
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hello!',
+                  style: theme.textTheme.bodyMedium!.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(
+                      0.7,
+                    ), // Using theme colors
+                    fontSize: 24, // Slightly adjusted font size
+                  ),
                 ),
-                child: CachedNetworkImage(
-                  imageUrl: 'https://via.placeholder.com/50',
-                  fit: BoxFit.cover,
-                  placeholder:
-                      (context, url) => Shimmer.fromColors(
-                        baseColor: BuddyTheme.backgroundSecondaryColor,
-                        highlightColor: BuddyTheme.backgroundPrimaryColor,
-                        child: Container(
-                          color: BuddyTheme.backgroundSecondaryColor,
+                const SizedBox(height: 4), // Spacing between greeting and name
+                Text(
+                  _userName,
+                  style: theme.textTheme.headlineSmall!.copyWith(
+                    // Changed to headlineSmall for more prominence
+                    fontWeight: FontWeight.bold,
+                    fontSize: 28,
+                    color:
+                        theme
+                            .colorScheme
+                            .onSurface, // Ensure text color is appropriate for theme
+                  ),
+                  maxLines: 1, // Ensure single line
+                  overflow: TextOverflow.ellipsis, // Handle long names
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16), // Spacing between text and avatar
+          Stack(
+            alignment: Alignment.topRight,
+            children: [
+              Container(
+                width: BuddyTheme.iconSizeXl,
+                height: BuddyTheme.iconSizeXl,
+                decoration: BoxDecoration(
+                  color:
+                      isDark
+                          ? theme.colorScheme.surfaceVariant.withOpacity(
+                            0.4,
+                          ) // Darker background for dark mode
+                          : theme
+                              .colorScheme
+                              .surfaceVariant, // Using theme color
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: theme.dividerColor.withOpacity(0.5), // Subtle border
+                    width: 1.5, // Slightly thicker border
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  // Use ClipOval for perfect circle clipping
+                  child: CachedNetworkImage(
+                    imageUrl:
+                        avatarUrl ??
+                        'https://via.placeholder.com/150', // Default placeholder image
+                    fit: BoxFit.cover,
+                    placeholder:
+                        (context, url) => Shimmer.fromColors(
+                          baseColor: theme.colorScheme.surfaceVariant,
+                          highlightColor: theme.colorScheme.surface,
+                          child: Container(
+                            width: BuddyTheme.iconSizeXl,
+                            height: BuddyTheme.iconSizeXl,
+                            color: Colors.white, // Shimmer color
+                          ),
                         ),
-                      ),
-                  errorWidget:
-                      (context, url, error) => Icon(
-                        Icons.person,
-                        color: BuddyTheme.textSecondaryColor,
-                        size: BuddyTheme.iconSizeLg,
-                      ),
+                    errorWidget:
+                        (context, url, error) => Icon(
+                          Icons.person,
+                          color: theme.colorScheme.onSurface.withOpacity(
+                            0.6,
+                          ), // Themed icon color
+                          size: BuddyTheme.iconSizeLg,
+                        ),
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ],
+              if (notificationCount >
+                  0) // Only show badge if count is greater than 0
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent, // Vibrant red for notifications
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: theme.cardColor,
+                        width: 2,
+                      ), // Border to stand out
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 20,
+                      minHeight: 20,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      notificationCount > 99
+                          ? '99+'
+                          : notificationCount.toString(), // Cap at 99+
+                      style: theme.textTheme.bodySmall!.copyWith(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -535,25 +623,86 @@ class _HomePageState extends State<HomePage>
     String title,
     VoidCallback onTap,
   ) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.displayMedium!.copyWith(fontWeight: FontWeight.bold),
-        ),
-        GestureDetector(
-          onTap: onTap,
-          child: Text(
-            'See All »',
-            style: Theme.of(
-              context,
-            ).textTheme.labelLarge!.copyWith(color: BuddyTheme.successColor),
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(
+        bottom: BuddyTheme.spacingSm,
+        top: BuddyTheme.spacingMd,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.2,
+              fontSize: 28,
+            ),
           ),
-        ),
-      ],
+          TextButton.icon(
+            onPressed: onTap,
+            icon: Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: theme.colorScheme.primary,
+            ),
+            label: Text(
+              'See All',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              foregroundColor: theme.colorScheme.primary,
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(60, 32),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(BuildContext context, IconData icon, String text) {
+    if (text.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final chipColor =
+        isDark
+            ? theme.colorScheme.primary.withOpacity(0.08)
+            : theme.colorScheme.primary.withOpacity(0.07);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      margin: const EdgeInsets.only(right: 4, bottom: 4),
+      decoration: BoxDecoration(
+        color: chipColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: theme.colorScheme.primary),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w500,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -561,21 +710,25 @@ class _HomePageState extends State<HomePage>
     BuildContext context,
     Map<String, dynamic> property,
   ) {
-    // Helper function to format currency
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor =
+        isDark
+            ? Color.alphaBlend(Colors.white.withOpacity(0.06), theme.cardColor)
+            : Color.alphaBlend(Colors.black.withOpacity(0.04), theme.cardColor);
+
     String formatPrice(String price) {
       if (price.isEmpty) return '';
       final amount = int.tryParse(price) ?? 0;
       return '₹${(amount / 1000).toStringAsFixed(0)}K/month';
     }
 
-    // Helper function to format date
     String formatAvailableDate(String? dateString) {
       if (dateString == null || dateString.isEmpty) return 'Immediate';
       try {
         final date = DateTime.parse(dateString);
         final now = DateTime.now();
         final difference = date.difference(now).inDays;
-
         if (difference <= 0) return 'Available Now';
         if (difference <= 7) return 'This Week';
         if (difference <= 30) return 'This Month';
@@ -585,7 +738,6 @@ class _HomePageState extends State<HomePage>
       }
     }
 
-    // Helper function to get short furnishing
     String getShortFurnishing(String furnishing) {
       if (furnishing.toLowerCase().contains('full')) return 'Fully Furnished';
       if (furnishing.toLowerCase().contains('semi')) return 'Semi Furnished';
@@ -593,270 +745,220 @@ class _HomePageState extends State<HomePage>
       return furnishing;
     }
 
-    return AnimatedOpacity(
-      opacity: 1.0,
-      duration: const Duration(milliseconds: 500),
-      child: Container(
-        width: 240, // More compact width
-        decoration: BuddyTheme.featuredCardDecoration,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image Section with Status Badge
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(BuddyTheme.borderRadiusMd),
-                    topRight: Radius.circular(BuddyTheme.borderRadiusMd),
-                  ),
-                  child: CachedNetworkImage(
-                    imageUrl:
-                        property['imageUrl'] ??
-                        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
-                    height: 110, // Slightly reduced height
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    placeholder:
-                        (context, url) => Shimmer.fromColors(
-                          baseColor: BuddyTheme.backgroundSecondaryColor,
-                          highlightColor: BuddyTheme.backgroundPrimaryColor,
-                          child: Container(
+    return InkWell(
+      borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
+      onTap: () {
+        final propertyId = property['key'] ?? '';
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PropertyDetailsScreen(propertyId: propertyId),
+          ),
+        );
+      },
+      child: AnimatedOpacity(
+        opacity: 1.0,
+        duration: const Duration(milliseconds: 500),
+        child: Container(
+          width: 250,
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.07),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image Section with Status Badge
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(BuddyTheme.borderRadiusMd),
+                      topRight: Radius.circular(BuddyTheme.borderRadiusMd),
+                    ),
+                    child: CachedNetworkImage(
+                      imageUrl:
+                          property['imageUrl'] ??
+                          'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
+                      height: 110,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      placeholder:
+                          (context, url) => Shimmer.fromColors(
+                            baseColor: theme.colorScheme.surfaceVariant,
+                            highlightColor: theme.colorScheme.surface,
+                            child: Container(height: 110),
+                          ),
+                      errorWidget:
+                          (context, url, error) => Container(
                             height: 110,
-                            color: BuddyTheme.backgroundSecondaryColor,
-                            child: const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                            color: Colors.grey[300],
+                            child: const Icon(
+                              Icons.broken_image,
+                              size: 40,
+                              color: Colors.grey,
                             ),
                           ),
-                        ),
-                    errorWidget:
-                        (context, url, error) => Container(
-                          height: 110,
-                          color: Colors.grey[300],
-                          child: const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.broken_image,
-                                size: 40,
-                                color: Colors.grey,
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Image not available',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                  ),
-                ),
-                // Available Status Badge
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'Available',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w500,
-                      ),
                     ),
                   ),
-                ),
-                // Room Type Badge
-                Positioned(
-                  bottom: 6,
-                  left: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '${property['roomType'] ?? ''} • ${property['flatSize'] ?? ''}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            Padding(
-              padding: const EdgeInsets.all(10), // Slightly reduced padding
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    property['title'] ?? 'Property Title',
-                    style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                      color: BuddyTheme.textPrimaryColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-
-                  // Location
-                  Text(
-                    property['location'] ?? 'Location',
-                    style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                      color: BuddyTheme.textSecondaryColor,
-                      fontSize: 11,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Price
-                  Text(
-                    formatPrice(property['rent'] ?? ''),
-                    style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                      color: BuddyTheme.accentColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-
-                  // First Row of Info Chips
-                  Wrap(
-                    spacing: 3,
-                    runSpacing: 2,
-                    children: [
-                      _buildInfoChip(
-                        context,
-                        Icons.chair,
-                        getShortFurnishing(property['furnishing'] ?? ''),
-                      ),
-                      _buildInfoChip(
-                        context,
-                        Icons.calendar_today,
-                        formatAvailableDate(property['availableFromDate']),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-
-                  // Second Row of Info Chips
-                  Wrap(
-                    spacing: 3,
-                    runSpacing: 2,
-                    children: [
-                      if (property['genderComposition'] != null &&
-                          property['genderComposition'].toString().isNotEmpty)
-                        _buildInfoChip(
-                          context,
-                          Icons.wc,
-                          property['genderComposition'],
-                        ),
-                      if (property['occupation'] != null &&
-                          property['occupation'].toString().isNotEmpty)
-                        _buildInfoChip(
-                          context,
-                          Icons.work,
-                          property['occupation'],
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Flatmates Info
-                  if (property['currentFlatmates'] != null &&
-                      property['maxFlatmates'] != null)
-                    Container(
+                  // Available Status Badge
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
+                        horizontal: 8,
+                        vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: BuddyTheme.backgroundSecondaryColor,
-                        borderRadius: BorderRadius.circular(4),
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.people_outline,
-                            size: 12,
-                            color: BuddyTheme.textSecondaryColor,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${property['currentFlatmates']}/${property['maxFlatmates']} flatmates',
-                            style: Theme.of(
-                              context,
-                            ).textTheme.bodySmall!.copyWith(
-                              color: BuddyTheme.textSecondaryColor,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
+                      child: const Text(
+                        'Available',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
+                  ),
+                  // Room Type Badge
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${property['roomType'] ?? ''} • ${property['flatSize'] ?? ''}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Enhanced info chip with better styling
-  Widget _buildInfoChip(BuildContext context, IconData icon, String text) {
-    if (text.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: BuddyTheme.backgroundSecondaryColor,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: BuddyTheme.borderColor.withOpacity(0.3),
-          width: 0.5,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: BuddyTheme.textSecondaryColor),
-          const SizedBox(width: 2),
-          Text(
-            text,
-            style: Theme.of(context).textTheme.bodySmall!.copyWith(
-              color: BuddyTheme.textSecondaryColor,
-              fontSize: 10,
-            ),
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            property['title'] ?? 'Property Title',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 19,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    // Location
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            property['location'] ?? 'Location',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.textTheme.bodySmall?.color
+                                  ?.withOpacity(0.7),
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    // Price
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            formatPrice(property['rent'] ?? ''),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    // Chips
+                    Row(
+                      spacing: 1.2,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        _buildInfoChip(
+                          context,
+                          Icons.chair,
+                          getShortFurnishing(property['furnishing'] ?? ''),
+                        ),
+                        _buildInfoChip(
+                          context,
+                          Icons.calendar_today,
+                          formatAvailableDate(property['availableFromDate']),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      spacing: 1.5,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        if (property['genderComposition'] != null &&
+                            property['genderComposition'].toString().isNotEmpty)
+                          _buildInfoChip(
+                            context,
+                            Icons.wc,
+                            property['genderComposition'],
+                          ),
+                        if (property['occupation'] != null &&
+                            property['occupation'].toString().isNotEmpty)
+                          _buildInfoChip(
+                            context,
+                            Icons.work,
+                            property['occupation'],
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -870,101 +972,114 @@ class _HomePageState extends State<HomePage>
     Color? cardColor,
     Color? labelColor,
   }) {
-    final Color effectiveCardColor =
-        cardColor ?? BuddyTheme.backgroundSecondaryColor;
-    final Color effectiveLabelColor = labelColor ?? BuddyTheme.textPrimaryColor;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardBg =
+        isDark
+            ? Color.alphaBlend(Colors.white.withOpacity(0.06), theme.cardColor)
+            : Color.alphaBlend(Colors.black.withOpacity(0.04), theme.cardColor);
+    final textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            BuddyTheme.primaryColor.withOpacity(0.12),
-            BuddyTheme.accentColor.withOpacity(0.10),
+    // You may want to pass a flatmate map or ID; here, we use a map for consistency
+    final flatmateData = {
+      'photoUrl': imageUrl,
+      'name': name,
+      'age': age,
+      'occupation': profession,
+    };
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => FlatmateDetailsPage(flatmateData: flatmateData),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
-        borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
-        border: Border.all(
-          color: BuddyTheme.primaryColor.withOpacity(0.25),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      width: 130,
-      padding: const EdgeInsets.all(BuddyTheme.spacingMd),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: Colors.white,
-            child: ClipOval(
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                fit: BoxFit.cover,
-                width: 64,
-                height: 64,
-                placeholder:
-                    (context, url) => Shimmer.fromColors(
-                      baseColor: effectiveCardColor,
-                      highlightColor: BuddyTheme.backgroundPrimaryColor,
-                      child: Container(color: effectiveCardColor),
-                    ),
-                errorWidget:
-                    (context, url, error) => Icon(
-                      Icons.person,
-                      color: effectiveLabelColor,
-                      size: BuddyTheme.iconSizeMd,
-                    ),
+        width: 140,
+        padding: const EdgeInsets.all(BuddyTheme.spacingMd),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 32,
+              backgroundColor: Colors.white,
+              child: ClipOval(
+                child: CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  fit: BoxFit.cover,
+                  width: 64,
+                  height: 64,
+                  placeholder:
+                      (context, url) => Shimmer.fromColors(
+                        baseColor: cardBg,
+                        highlightColor: theme.colorScheme.surface,
+                        child: Container(color: cardBg),
+                      ),
+                  errorWidget:
+                      (context, url, error) => Icon(
+                        Icons.person,
+                        color: textPrimary,
+                        size: BuddyTheme.iconSizeMd,
+                      ),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: BuddyTheme.spacingXs),
-          Text(
-            name,
-            style: Theme.of(context).textTheme.titleMedium!.copyWith(
-              fontWeight: FontWeight.w700,
-              color: effectiveLabelColor,
-              fontSize: 16,
-              letterSpacing: 0.1,
-            ),
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
-          if (age.isNotEmpty)
+            const SizedBox(height: BuddyTheme.spacingXs),
             Text(
-              'Age: $age',
-              style: Theme.of(context).textTheme.bodySmall!.copyWith(
-                color: effectiveLabelColor.withOpacity(0.7),
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+              name,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: textPrimary,
+                fontSize: 16,
+                letterSpacing: 0.1,
               ),
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
             ),
-          Text(
-            profession.isNotEmpty ? profession : '—',
-            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: BuddyTheme.accentColor,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-              letterSpacing: 0.1,
+            if (age.isNotEmpty)
+              Text(
+                'Age: $age',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: textPrimary.withOpacity(0.7),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            Text(
+              profession.isNotEmpty ? profession : '—',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                letterSpacing: 0.1,
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -975,10 +1090,17 @@ class _HomePageState extends State<HomePage>
     required String name,
     required String type,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor =
+        isDark
+            ? Color.alphaBlend(Colors.white.withOpacity(0.06), theme.cardColor)
+            : Color.alphaBlend(Colors.black.withOpacity(0.04), theme.cardColor);
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: BuddyTheme.backgroundSecondaryColor,
+        color: cardColor,
         borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
         boxShadow: [
           BoxShadow(
@@ -988,10 +1110,8 @@ class _HomePageState extends State<HomePage>
           ),
         ],
       ),
-      width: 120,
-      padding: const EdgeInsets.all(
-        BuddyTheme.spacingSm,
-      ), // Reduced from spacingMd
+      width: 130,
+      padding: const EdgeInsets.all(BuddyTheme.spacingSm),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -999,21 +1119,19 @@ class _HomePageState extends State<HomePage>
             borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
             child: CachedNetworkImage(
               imageUrl: imageUrl,
-              height: 60, // Reduced from 80
+              height: 60,
               width: double.infinity,
               fit: BoxFit.cover,
               placeholder:
                   (context, url) => Shimmer.fromColors(
-                    baseColor: BuddyTheme.backgroundSecondaryColor,
-                    highlightColor: BuddyTheme.backgroundPrimaryColor,
-                    child: Container(
-                      color: BuddyTheme.backgroundSecondaryColor,
-                    ),
+                    baseColor: cardColor,
+                    highlightColor: theme.colorScheme.surface,
+                    child: Container(color: cardColor),
                   ),
               errorWidget:
                   (context, url, error) => Icon(
                     Icons.broken_image,
-                    color: BuddyTheme.textSecondaryColor,
+                    color: theme.colorScheme.primary,
                     size: BuddyTheme.iconSizeLg,
                   ),
             ),
@@ -1021,17 +1139,17 @@ class _HomePageState extends State<HomePage>
           const SizedBox(height: BuddyTheme.spacingXs),
           Text(
             name,
-            style: Theme.of(context).textTheme.titleMedium!.copyWith(
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              color: BuddyTheme.textPrimaryColor,
+              color: theme.textTheme.bodyLarge?.color,
             ),
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
           ),
           Text(
             type,
-            style: Theme.of(context).textTheme.bodySmall!.copyWith(
-              color: BuddyTheme.textSecondaryColor,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
             ),
             textAlign: TextAlign.center,
             overflow: TextOverflow.ellipsis,
@@ -1047,14 +1165,32 @@ class _HomePageState extends State<HomePage>
     required String title,
     required String price,
     required String location,
-    required String type, // e.g. "Shared", "Private", "PG", etc.
+    required String type,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor =
+        isDark
+            ? Color.alphaBlend(Colors.white.withOpacity(0.06), theme.cardColor)
+            : Color.alphaBlend(Colors.black.withOpacity(0.04), theme.cardColor);
+
     return AnimatedOpacity(
       opacity: 1.0,
       duration: const Duration(milliseconds: 500),
       child: Container(
         width: 255,
-        decoration: BuddyTheme.featuredCardDecoration,
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1070,11 +1206,9 @@ class _HomePageState extends State<HomePage>
                 fit: BoxFit.cover,
                 placeholder:
                     (context, url) => Shimmer.fromColors(
-                      baseColor: BuddyTheme.backgroundSecondaryColor,
-                      highlightColor: BuddyTheme.backgroundPrimaryColor,
-                      child: Container(
-                        color: BuddyTheme.backgroundSecondaryColor,
-                      ),
+                      baseColor: cardColor,
+                      highlightColor: theme.colorScheme.surface,
+                      child: Container(color: cardColor),
                     ),
                 errorWidget:
                     (context, url, error) => Container(
@@ -1098,15 +1232,16 @@ class _HomePageState extends State<HomePage>
                       Expanded(
                         child: Text(
                           title,
-                          style: Theme.of(context).textTheme.titleLarge!
-                              .copyWith(color: BuddyTheme.textPrimaryColor),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: theme.textTheme.bodyLarge?.color,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Text(
                         price,
-                        style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                          color: BuddyTheme.accentColor,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: theme.colorScheme.primary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -1117,15 +1252,17 @@ class _HomePageState extends State<HomePage>
                     children: [
                       Icon(
                         Icons.location_on,
-                        color: BuddyTheme.textSecondaryColor,
+                        color: theme.colorScheme.primary,
                         size: BuddyTheme.iconSizeSm,
                       ),
                       const SizedBox(width: BuddyTheme.spacingXxs),
                       Expanded(
                         child: Text(
                           location,
-                          style: Theme.of(context).textTheme.bodySmall!
-                              .copyWith(color: BuddyTheme.textSecondaryColor),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.textTheme.bodySmall?.color
+                                ?.withOpacity(0.7),
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
