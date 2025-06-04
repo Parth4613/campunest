@@ -1,5 +1,3 @@
-import 'package:buddy/display%20pages/flatmate_details.dart';
-import 'package:buddy/display%20pages/property_details.dart';
 import 'package:flutter/material.dart';
 import 'theme.dart';
 import 'profile_page.dart';
@@ -9,7 +7,7 @@ import 'widgets/action_sheet.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'dart:async';
 
 export 'profile_page.dart';
 export 'need_room_page.dart';
@@ -41,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _pages = [
       HomePage(
         key: const Key('home'),
-        onTabChange: _onItemTapped, // Pass the callback here
+        onTabChange: _onItemTapped,
       ),
       const NeedRoomPage(key: Key('needroom')),
       const NeedFlatmatePage(key: Key('needflatmate')),
@@ -65,13 +63,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final navBarColor =
-        isDark
-            ? const Color(0xFF23262F) // Custom dark shade for nav bar
-            : const Color(0xFFF5F6FA); // Custom light shade for nav bar
-    final navBarIconColor =
-        isDark ? Colors.white : BuddyTheme.textSecondaryColor;
+    final navBarColor = theme.brightness == Brightness.dark
+            ? const Color(0xFF23262F)
+            : const Color(0xFFF5F6FA);
+    final navBarIconColor = theme.brightness == Brightness.dark 
+            ? Colors.white 
+            : BuddyTheme.textSecondaryColor;
     final navBarSelectedColor = BuddyTheme.primaryColor;
 
     return Scaffold(
@@ -98,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               )
-              : null, // Hide FAB on other pages
+              : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
         notchMargin: BuddyTheme.spacingSm,
@@ -198,9 +195,9 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class HomePage extends StatefulWidget {
-  final void Function(int)? onTabChange; // Add this line
+  final void Function(int)? onTabChange;
 
-  const HomePage({super.key, this.onTabChange}); // Update constructor
+  const HomePage({super.key, this.onTabChange});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -210,53 +207,12 @@ class _HomePageState extends State<HomePage>
     with AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
   String _userName = '';
-
-  int notificationCount =
-      0; // TODO: Replace with actual notification count logic
+  String _selectedLocation = 'Select Location';
 
   @override
   void initState() {
     super.initState();
     _loadUserName();
-    _fetchFeaturedProperties();
-    _fetchFeaturedFlatmates();
-  }
-
-  Future<void> _fetchFeaturedProperties() async {
-    final ref = FirebaseDatabase.instance.ref().child('room_listings');
-    final snapshot = await ref.get();
-    final List<Map<dynamic, dynamic>> properties = [];
-    if (snapshot.exists) {
-      final data = snapshot.value as Map<dynamic, dynamic>;
-      data.forEach((key, value) {
-        final property = Map<String, dynamic>.from(value as Map);
-        property['key'] = key;
-        properties.add(property);
-      });
-    }
-    setState(() {
-      _featuredProperties =
-          properties.take(5).toList(); // Show top 5, or filter as needed
-      _isLoadingProperties = false;
-    });
-  }
-
-  Future<void> _fetchFeaturedFlatmates() async {
-    final ref = FirebaseDatabase.instance.ref().child('room_requests');
-    final snapshot = await ref.get();
-    final List<Map<dynamic, dynamic>> flatmates = [];
-    if (snapshot.exists) {
-      final data = snapshot.value as Map<dynamic, dynamic>;
-      data.forEach((key, value) {
-        final flatmate = Map<String, dynamic>.from(value as Map);
-        flatmate['key'] = key;
-        flatmates.add(flatmate);
-      });
-    }
-    setState(() {
-      _featuredFlatmates = flatmates.take(5).toList(); // Show top 5
-      _isLoadingFlatmates = false;
-    });
   }
 
   Future<void> _loadUserName() async {
@@ -266,7 +222,7 @@ class _HomePageState extends State<HomePage>
       if (user.displayName != null && user.displayName!.trim().isNotEmpty) {
         name = user.displayName!;
       } else if (user.email != null && user.email!.trim().isNotEmpty) {
-        name = user.email!.split('@')[0]; // Use email prefix as fallback
+        name = user.email!.split('@')[0];
       } else if (user.phoneNumber != null &&
           user.phoneNumber!.trim().isNotEmpty) {
         name = user.phoneNumber!;
@@ -291,10 +247,12 @@ class _HomePageState extends State<HomePage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final theme = Theme.of(context);
+
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: () async {
-          await Future.delayed(const Duration(seconds: 2)); // Simulate refresh
+          await Future.delayed(const Duration(seconds: 2));
         },
         color: BuddyTheme.primaryColor,
         child: CustomScrollView(
@@ -304,167 +262,35 @@ class _HomePageState extends State<HomePage>
           ),
           slivers: [
             SliverPadding(
-              padding: const EdgeInsets.all(BuddyTheme.spacingMd),
+              padding: const EdgeInsets.only(left: BuddyTheme.spacingMd, right: BuddyTheme.spacingMd, bottom: BuddyTheme.spacingMd),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  _buildHeader(context),
+                  _buildUpdatedHeader(context),
+                  
+                  // Section header for Hostels & PGs
+                  _buildSectionHeader(context, 'Hostels & PGs'),
+                  const SizedBox(height: BuddyTheme.spacingMd),
+                  _buildHostelsBannerSection(context),
                   const SizedBox(height: BuddyTheme.spacingLg),
 
-                  // Featured Properties
-                  _buildSectionHeader(
-                    context,
-                    'Featured Properties',
-                    () => widget.onTabChange?.call(1),
-                  ),
-                  const SizedBox(height: BuddyTheme.spacingSm),
-                  SizedBox(
-                    height: 287,
-                    child:
-                        _isLoadingProperties
-                            ? const Center(child: CircularProgressIndicator())
-                            : ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _featuredProperties.length,
-                              separatorBuilder:
-                                  (context, index) => const SizedBox(
-                                    width: BuddyTheme.spacingSm,
-                                  ),
-                              itemBuilder: (context, index) {
-                                final property = _featuredProperties[index];
-                                return _buildPropertyCard(
-                                  context,
-                                  property as Map<String, dynamic>,
-                                );
-                              },
-                            ),
-                  ),
-
+                  // Section header for Other Services
+                  _buildSectionHeader(context, 'Other Services'),
                   const SizedBox(height: BuddyTheme.spacingMd),
-
-                  // Hostels/PG Section
-                  _buildSectionHeader(
-                    context,
-                    'Hostels / PG',
-                    () => Navigator.pushNamed(context, '/hostelpg'),
-                  ),
-                  const SizedBox(height: BuddyTheme.spacingSm),
-                  SizedBox(
-                    height: 270,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        _buildHostelCard(
-                          context,
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80',
-                          title: 'Sunrise Hostel',
-                          price: '\$120/mo',
-                          location: 'Downtown, NY',
-                          type: 'Shared',
-                        ),
-                        const SizedBox(width: BuddyTheme.spacingSm),
-                        _buildHostelCard(
-                          context,
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80',
-                          title: 'Sunset PG',
-                          price: '\$150/mo',
-                          location: 'Uptown, NY',
-                          type: 'Private',
-                        ),
-                        const SizedBox(width: BuddyTheme.spacingSm),
-                        _buildHostelCard(
-                          context,
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80',
-                          title: 'Moonlight Hostel',
-                          price: '\$100/mo',
-                          location: 'Midtown, NY',
-                          type: 'Shared',
-                        ),
-                      ],
-                    ),
-                  ),
-
+                  _buildServicesBannerSection(context),
+                  const SizedBox(height: BuddyTheme.spacingXl),
+                  
+                  // Section header for Rooms
+                  _buildSectionHeader(context, 'Rooms'),
                   const SizedBox(height: BuddyTheme.spacingMd),
-
-                  // Featured Services Section
-                  _buildSectionHeader(
-                    context,
-                    'Featured Services',
-                    () => Navigator.pushNamed(context, '/services'),
-                  ),
-                  const SizedBox(height: BuddyTheme.spacingSm),
-                  SizedBox(
-                    height: 200, // Increased from 180
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        _buildServiceCard(
-                          context,
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
-                          name: 'Cafe Mocha',
-                          type: 'Cafe',
-                        ),
-                        const SizedBox(width: BuddyTheme.spacingSm),
-                        _buildServiceCard(
-                          context,
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1460518451285-97b6aa326961?auto=format&fit=crop&w=400&q=80',
-                          name: 'City Library',
-                          type: 'Library',
-                        ),
-                        const SizedBox(width: BuddyTheme.spacingSm),
-                        _buildServiceCard(
-                          context,
-                          imageUrl:
-                              'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
-                          name: 'Gym Fitness',
-                          type: 'Gym',
-                        ),
-                      ],
-                    ),
-                  ),
-
+                  _buildRoomsBannerSection(context),
+                  const SizedBox(height: BuddyTheme.spacingLg),
+                  
+                  // Section header for Flatmates
+                  _buildSectionHeader(context, 'Flatmates'),
                   const SizedBox(height: BuddyTheme.spacingMd),
-
-                  // Featured Flatmates
-                  _buildSectionHeader(
-                    context,
-                    'Featured Flatmates',
-                    () => widget.onTabChange?.call(2),
-                  ),
-                  const SizedBox(height: BuddyTheme.spacingSm),
-                  SizedBox(
-                    height: 180,
-                    child:
-                        _isLoadingFlatmates
-                            ? const Center(child: CircularProgressIndicator())
-                            : ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _featuredFlatmates.length,
-                              separatorBuilder:
-                                  (context, index) => const SizedBox(
-                                    width: BuddyTheme.spacingSm,
-                                  ),
-                              itemBuilder: (context, index) {
-                                final flatmate = _featuredFlatmates[index];
-                                return _buildFlatmateCard(
-                                  context,
-                                  imageUrl:
-                                      flatmate['photoUrl'] ??
-                                      'https://randomuser.me/api/portraits/men/32.jpg',
-                                  name: flatmate['name'] ?? 'No Name',
-                                  age: flatmate['age']?.toString() ?? '',
-                                  profession:
-                                      flatmate['occupation'] ??
-                                      flatmate['about'] ??
-                                      '',
-                                );
-                              },
-                            ),
-                  ),
+                  _buildFlatmatesBannerSection(context),
+                  const SizedBox(height: BuddyTheme.spacingLg),
+                  
                 ]),
               ),
             ),
@@ -474,802 +300,288 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildUpdatedHeader(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    // Get the current user's avatar URL or use a placeholder
     final user = FirebaseAuth.instance.currentUser;
     final String? avatarUrl = user?.photoURL;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16.0,
-        vertical: 12.0,
-      ), // Added padding for overall header
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            // Use Expanded to prevent text overflow in the Column
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hello!',
-                  style: theme.textTheme.bodyMedium!.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(
-                      0.7,
-                    ), // Using theme colors
-                    fontSize: 24, // Slightly adjusted font size
-                  ),
-                ),
-                const SizedBox(height: 4), // Spacing between greeting and name
-                Text(
-                  _userName,
-                  style: theme.textTheme.headlineSmall!.copyWith(
-                    // Changed to headlineSmall for more prominence
-                    fontWeight: FontWeight.bold,
-                    fontSize: 28,
-                    color:
-                        theme
-                            .colorScheme
-                            .onSurface, // Ensure text color is appropriate for theme
-                  ),
-                  maxLines: 1, // Ensure single line
-                  overflow: TextOverflow.ellipsis, // Handle long names
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16), // Spacing between text and avatar
-          Stack(
-            alignment: Alignment.topRight,
-            children: [
-              Container(
-                width: BuddyTheme.iconSizeXl,
-                height: BuddyTheme.iconSizeXl,
-                decoration: BoxDecoration(
-                  color:
-                      isDark
-                          ? theme.colorScheme.surfaceVariant.withOpacity(
-                            0.4,
-                          ) // Darker background for dark mode
-                          : theme
-                              .colorScheme
-                              .surfaceVariant, // Using theme color
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: theme.dividerColor.withOpacity(0.5), // Subtle border
-                    width: 1.5, // Slightly thicker border
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(isDark ? 0.3 : 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: ClipOval(
-                  // Use ClipOval for perfect circle clipping
-                  child: CachedNetworkImage(
-                    imageUrl:
-                        avatarUrl ??
-                        'https://via.placeholder.com/150', // Default placeholder image
-                    fit: BoxFit.cover,
-                    placeholder:
-                        (context, url) => Shimmer.fromColors(
-                          baseColor: theme.colorScheme.surfaceVariant,
-                          highlightColor: theme.colorScheme.surface,
-                          child: Container(
-                            width: BuddyTheme.iconSizeXl,
-                            height: BuddyTheme.iconSizeXl,
-                            color: Colors.white, // Shimmer color
-                          ),
-                        ),
-                    errorWidget:
-                        (context, url, error) => Icon(
-                          Icons.person,
-                          color: theme.colorScheme.onSurface.withOpacity(
-                            0.6,
-                          ), // Themed icon color
-                          size: BuddyTheme.iconSizeLg,
-                        ),
-                  ),
-                ),
-              ),
-              if (notificationCount >
-                  0) // Only show badge if count is greater than 0
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent, // Vibrant red for notifications
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: theme.cardColor,
-                        width: 2,
-                      ), // Border to stand out
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 20,
-                      minHeight: 20,
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      notificationCount > 99
-                          ? '99+'
-                          : notificationCount.toString(), // Cap at 99+
-                      style: theme.textTheme.bodySmall!.copyWith(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(
-    BuildContext context,
-    String title,
-    VoidCallback onTap,
-  ) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(
-        bottom: BuddyTheme.spacingSm,
-        top: BuddyTheme.spacingMd,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.2,
-              fontSize: 28,
-            ),
-          ),
-          TextButton.icon(
-            onPressed: onTap,
-            icon: Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 16,
-              color: theme.colorScheme.primary,
-            ),
-            label: Text(
-              'See All',
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            style: TextButton.styleFrom(
-              foregroundColor: theme.colorScheme.primary,
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(60, 32),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoChip(BuildContext context, IconData icon, String text) {
-    if (text.isEmpty) return const SizedBox.shrink();
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final chipColor =
-        isDark
-            ? theme.colorScheme.primary.withOpacity(0.08)
-            : theme.colorScheme.primary.withOpacity(0.07);
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      margin: const EdgeInsets.only(right: 4, bottom: 4),
-      decoration: BoxDecoration(
-        color: chipColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+      child: Column(
         children: [
-          Icon(icon, size: 14, color: theme.colorScheme.primary),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w500,
-              fontSize: 11,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPropertyCard(
-    BuildContext context,
-    Map<String, dynamic> property,
-  ) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final cardColor =
-        isDark
-            ? Color.alphaBlend(Colors.white.withOpacity(0.06), theme.cardColor)
-            : Color.alphaBlend(Colors.black.withOpacity(0.04), theme.cardColor);
-
-    String formatPrice(String price) {
-      if (price.isEmpty) return '';
-      final amount = int.tryParse(price) ?? 0;
-      return '₹${(amount / 1000).toStringAsFixed(0)}K/month';
-    }
-
-    String formatAvailableDate(String? dateString) {
-      if (dateString == null || dateString.isEmpty) return 'Immediate';
-      try {
-        final date = DateTime.parse(dateString);
-        final now = DateTime.now();
-        final difference = date.difference(now).inDays;
-        if (difference <= 0) return 'Available Now';
-        if (difference <= 7) return 'This Week';
-        if (difference <= 30) return 'This Month';
-        return '${date.day}/${date.month}';
-      } catch (e) {
-        return 'Available';
-      }
-    }
-
-    String getShortFurnishing(String furnishing) {
-      if (furnishing.toLowerCase().contains('full')) return 'Fully Furnished';
-      if (furnishing.toLowerCase().contains('semi')) return 'Semi Furnished';
-      if (furnishing.toLowerCase().contains('un')) return 'Unfurnished';
-      return furnishing;
-    }
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
-      onTap: () {
-        final propertyId = property['key'] ?? '';
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PropertyDetailsScreen(propertyId: propertyId),
-          ),
-        );
-      },
-      child: AnimatedOpacity(
-        opacity: 1.0,
-        duration: const Duration(milliseconds: 500),
-        child: Container(
-          width: 250,
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.07),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // Top row with greeting and profile
+          Row(
             children: [
-              // Image Section with Status Badge
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(BuddyTheme.borderRadiusMd),
-                      topRight: Radius.circular(BuddyTheme.borderRadiusMd),
-                    ),
-                    child: CachedNetworkImage(
-                      imageUrl:
-                          property['imageUrl'] ??
-                          'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
-                      height: 110,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      placeholder:
-                          (context, url) => Shimmer.fromColors(
-                            baseColor: theme.colorScheme.surfaceVariant,
-                            highlightColor: theme.colorScheme.surface,
-                            child: Container(height: 110),
-                          ),
-                      errorWidget:
-                          (context, url, error) => Container(
-                            height: 110,
-                            color: Colors.grey[300],
-                            child: const Icon(
-                              Icons.broken_image,
-                              size: 40,
-                              color: Colors.grey,
-                            ),
-                          ),
-                    ),
-                  ),
-                  // Available Status Badge
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        'Available',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Room Type Badge
-                  Positioned(
-                    bottom: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '${property['roomType'] ?? ''} • ${property['flatSize'] ?? ''}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.all(10),
+              // Greeting and Name
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Title
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            property['title'] ?? 'Property Title',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 19,
+                    Text(
+                      'Hello $_userName,',
+                      style: theme.textTheme.titleLarge!.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 22,
+                        color: theme.brightness == Brightness.dark ? Colors.white : Colors.black87,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    InkWell(
+                      onTap: () {
+                        _showLocationSelector(context);
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            color: theme.brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black54,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _selectedLocation,
+                            style: theme.textTheme.bodyMedium!.copyWith(
+                              color: theme.brightness == Brightness.dark ? Colors.white.withOpacity(0.7) : Colors.black54,
+                              fontSize: 14,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    // Location
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            property['location'] ?? 'Location',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.textTheme.bodySmall?.color
-                                  ?.withOpacity(0.7),
-                              fontSize: 12,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    // Price
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            formatPrice(property['rent'] ?? ''),
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    // Chips
-                    Row(
-                      spacing: 1.2,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        _buildInfoChip(
-                          context,
-                          Icons.chair,
-                          getShortFurnishing(property['furnishing'] ?? ''),
-                        ),
-                        _buildInfoChip(
-                          context,
-                          Icons.calendar_today,
-                          formatAvailableDate(property['availableFromDate']),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      spacing: 1.5,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        if (property['genderComposition'] != null &&
-                            property['genderComposition'].toString().isNotEmpty)
-                          _buildInfoChip(
-                            context,
-                            Icons.wc,
-                            property['genderComposition'],
-                          ),
-                        if (property['occupation'] != null &&
-                            property['occupation'].toString().isNotEmpty)
-                          _buildInfoChip(
-                            context,
-                            Icons.work,
-                            property['occupation'],
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
+              // Profile Avatar with black circle border and tap functionality
+              GestureDetector(
+                onTap: () => widget.onTabChange?.call(3), // Navigate to Profile tab
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: theme.brightness == Brightness.dark ? Colors.white.withOpacity(0.4) : Colors.black.withOpacity(0.4),
+                      width: 2,
+                    ),
+                  ),
+                  child: Container(
+                    margin: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: theme.brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
+                    ),
+                    child: ClipOval(
+                      child: CachedNetworkImage(
+                        imageUrl: avatarUrl ?? 'https://via.placeholder.com/150',
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Shimmer.fromColors(
+                          baseColor: theme.colorScheme.surfaceVariant,
+                          highlightColor: theme.colorScheme.surface,
+                          child: Container(color: Colors.white),
+                        ),
+                        errorWidget: (context, url, error) => Icon(
+                          Icons.person,
+                          color: BuddyTheme.primaryColor,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
-        ),
+          const SizedBox(height: 12),
+          // Promotional Banner Carousel
+          _buildPromoBannerCarousel(context),
+        ],
       ),
     );
   }
 
-  Widget _buildFlatmateCard(
-    BuildContext context, {
-    required String imageUrl,
-    required String name,
-    required String age,
-    required String profession,
-    Color? cardColor,
-    Color? labelColor,
-  }) {
+  Widget _buildPromoBannerCarousel(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final cardBg =
-        isDark
-            ? Color.alphaBlend(Colors.white.withOpacity(0.06), theme.cardColor)
-            : Color.alphaBlend(Colors.black.withOpacity(0.04), theme.cardColor);
-    final textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
+    
+    // Define your promotional banners
+    final List<Map<String, dynamic>> banners = [
+      {
+        'title': 'HOSTEL & PGs',
+        'subtitle': 'Find Your Perfect Accommodation',
+        'icon': Icons.home_work,
+        'image': 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        'title': 'NEEDY SERVICES',
+        'subtitle': 'Get Connected with Local Services',
+        'icon': Icons.support_agent,
+        'image': 'https://images.unsplash.com/photo-1582735689369-4fe89db7114c?auto=format&fit=crop&w=400&q=80',
+      },
+      {
+        'title': 'FLATMATES FINDER',
+        'subtitle': 'Connect With Perfect Roommates',
+        'icon': Icons.people,
+        'image': 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=400&q=80',
+      },
+      {
+        'title': 'ROOM FINDER',
+        'subtitle': 'Discover Your Ideal Space',
+        'icon': Icons.bed,
+        'image': 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=400&q=80',
+      },
+    ];
 
-    // You may want to pass a flatmate map or ID; here, we use a map for consistency
-    final flatmateData = {
-      'photoUrl': imageUrl,
-      'name': name,
-      'age': age,
-      'occupation': profession,
-    };
+    return _BannerCarouselWidget(banners: banners, theme: theme);
+  }
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (context) => FlatmateDetailsPage(flatmateData: flatmateData),
+  void _showLocationSelector(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          height: 300,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Select Location',
+                style: Theme.of(context).textTheme.titleLarge!.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.my_location),
+                title: const Text('Use current location'),
+                onTap: () {
+                  setState(() {
+                    _selectedLocation = 'Current Location';
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.location_city),
+                title: const Text('Mumbai, Maharashtra'),
+                onTap: () {
+                  setState(() {
+                    _selectedLocation = 'Mumbai, Maharashtra';
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.location_city),
+                title: const Text('Pune, Maharashtra'),
+                onTap: () {
+                  setState(() {
+                    _selectedLocation = 'Pune, Maharashtra';
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.location_city),
+                title: const Text('Kolhapur, Maharashtra'),
+                onTap: () {
+                  setState(() {
+                    _selectedLocation = 'Kolhapur, Maharashtra';
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildHostelsBannerSection(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return InkWell(
+      onTap: () => Navigator.pushNamed(context, '/hostelpg'),
+      borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        height: 180,
         decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
+          borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: BuddyTheme.primaryColor.withOpacity(0.25),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
           ],
         ),
-        width: 140,
-        padding: const EdgeInsets.all(BuddyTheme.spacingMd),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: 32,
-              backgroundColor: Colors.white,
-              child: ClipOval(
-                child: CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  fit: BoxFit.cover,
-                  width: 64,
-                  height: 64,
-                  placeholder:
-                      (context, url) => Shimmer.fromColors(
-                        baseColor: cardBg,
-                        highlightColor: theme.colorScheme.surface,
-                        child: Container(color: cardBg),
-                      ),
-                  errorWidget:
-                      (context, url, error) => Icon(
-                        Icons.person,
-                        color: textPrimary,
-                        size: BuddyTheme.iconSizeMd,
-                      ),
-                ),
-              ),
-            ),
-            const SizedBox(height: BuddyTheme.spacingXs),
-            Text(
-              name,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: textPrimary,
-                fontSize: 16,
-                letterSpacing: 0.1,
-              ),
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-            ),
-            if (age.isNotEmpty)
-              Text(
-                'Age: $age',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: textPrimary.withOpacity(0.7),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            Text(
-              profession.isNotEmpty ? profession : '—',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-                letterSpacing: 0.1,
-              ),
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildServiceCard(
-    BuildContext context, {
-    required String imageUrl,
-    required String name,
-    required String type,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final cardColor =
-        isDark
-            ? Color.alphaBlend(Colors.white.withOpacity(0.06), theme.cardColor)
-            : Color.alphaBlend(Colors.black.withOpacity(0.04), theme.cardColor);
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      width: 130,
-      padding: const EdgeInsets.all(BuddyTheme.spacingSm),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
-            child: CachedNetworkImage(
-              imageUrl: imageUrl,
-              height: 60,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              placeholder:
-                  (context, url) => Shimmer.fromColors(
-                    baseColor: cardColor,
-                    highlightColor: theme.colorScheme.surface,
-                    child: Container(color: cardColor),
-                  ),
-              errorWidget:
-                  (context, url, error) => Icon(
-                    Icons.broken_image,
-                    color: theme.colorScheme.primary,
-                    size: BuddyTheme.iconSizeLg,
-                  ),
-            ),
-          ),
-          const SizedBox(height: BuddyTheme.spacingXs),
-          Text(
-            name,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.textTheme.bodyLarge?.color,
-            ),
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            type,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
-            ),
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHostelCard(
-    BuildContext context, {
-    required String imageUrl,
-    required String title,
-    required String price,
-    required String location,
-    required String type,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final cardColor =
-        isDark
-            ? Color.alphaBlend(Colors.white.withOpacity(0.06), theme.cardColor)
-            : Color.alphaBlend(Colors.black.withOpacity(0.04), theme.cardColor);
-
-    return AnimatedOpacity(
-      opacity: 1.0,
-      duration: const Duration(milliseconds: 500),
-      child: Container(
-        width: 255,
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(BuddyTheme.borderRadiusMd),
-                topRight: Radius.circular(BuddyTheme.borderRadiusMd),
-              ),
+              borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
               child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                height: 150,
+                imageUrl: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=800&q=80',
+                height: 180,
                 width: double.infinity,
                 fit: BoxFit.cover,
-                placeholder:
-                    (context, url) => Shimmer.fromColors(
-                      baseColor: cardColor,
-                      highlightColor: theme.colorScheme.surface,
-                      child: Container(color: cardColor),
-                    ),
-                errorWidget:
-                    (context, url, error) => Container(
-                      color: Colors.grey[300],
-                      child: const Icon(
-                        Icons.broken_image,
-                        size: 60,
-                        color: Colors.grey,
-                      ),
-                    ),
+                placeholder: (context, url) => Shimmer.fromColors(
+                  baseColor: theme.colorScheme.surfaceVariant,
+                  highlightColor: theme.colorScheme.surface,
+                  child: Container(height: 180, color: theme.colorScheme.surfaceVariant),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  height: 180,
+                  color: theme.colorScheme.surfaceVariant,
+                  child: Icon(Icons.business, color: BuddyTheme.primaryColor, size: 50),
+                ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(BuddyTheme.spacingSm),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.black.withOpacity(0.3), Colors.black.withOpacity(0.7)],
+                ),
+              ),
+            ),
+            // Main content at the bottom
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 16,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            color: theme.textTheme.bodyLarge?.color,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Text(
-                        price,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'Find Your Perfect\nAccommodation',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      height: 1.2,
+                    ),
                   ),
-                  const SizedBox(height: BuddyTheme.spacingXs),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        color: theme.colorScheme.primary,
-                        size: BuddyTheme.iconSizeSm,
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Colors.white.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      'Explore Now →',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
                       ),
-                      const SizedBox(width: BuddyTheme.spacingXxs),
-                      Expanded(
-                        child: Text(
-                          location,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.textTheme.bodySmall?.color
-                                ?.withOpacity(0.7),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: BuddyTheme.spacingSm),
-                  _buildInfoChip(context, Icons.meeting_room, type),
                 ],
               ),
             ),
@@ -1278,27 +590,522 @@ class _HomePageState extends State<HomePage>
       ),
     );
   }
-}
 
-class PropertyData {
-  final String imageUrl;
-  // ... other fields
+  Widget _buildRoomsBannerSection(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return InkWell(
+      onTap: () => widget.onTabChange?.call(1), // Navigate to Need Room tab
+      borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
+      child: Container(
+        height: 180,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
+          boxShadow: [
+            BoxShadow(
+              color: BuddyTheme.successColor.withOpacity(0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
+              child: CachedNetworkImage(
+                imageUrl: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80',
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Shimmer.fromColors(
+                  baseColor: theme.colorScheme.surfaceVariant,
+                  highlightColor: theme.colorScheme.surface,
+                  child: Container(height: 180, color: theme.colorScheme.surfaceVariant),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  height: 180,
+                  color: theme.colorScheme.surfaceVariant,
+                  child: Icon(Icons.hotel, color: BuddyTheme.successColor, size: 50),
+                ),
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.black.withOpacity(0.3), Colors.black.withOpacity(0.7)],
+                ),
+              ),
+            ),
+            // Main content at the bottom
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Looking for a\nRoom to Rent?',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Colors.white.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      'Find Rooms →',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-  PropertyData({
-    required this.imageUrl,
-    // ... other fields
-  });
+  Widget _buildFlatmatesBannerSection(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return InkWell(
+      onTap: () => widget.onTabChange?.call(2), // Navigate to Need Flatmate tab
+      borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
+      child: Container(
+        height: 180,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
+          boxShadow: [
+            BoxShadow(
+              color: BuddyTheme.warningColor.withOpacity(0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
+              child: CachedNetworkImage(
+                imageUrl: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=800&q=80',
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Shimmer.fromColors(
+                  baseColor: theme.colorScheme.surfaceVariant,
+                  highlightColor: theme.colorScheme.surface,
+                  child: Container(height: 180, color: theme.colorScheme.surfaceVariant),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  height: 180,
+                  color: theme.colorScheme.surfaceVariant,
+                  child: Icon(Icons.group, color: BuddyTheme.warningColor, size: 50),
+                ),
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.black.withOpacity(0.3), Colors.black.withOpacity(0.7)],
+                ),
+              ),
+            ),
+            // Main content at the bottom
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Find Your Perfect\nFlatmate Match',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Colors.white.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      'Find Flatmates →',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-  factory PropertyData.fromJson(Map<String, dynamic> json) {
-    return PropertyData(
-      imageUrl: json['imageUrl'] ?? '',
-      // ... other fields
+  Widget _buildServicesBannerSection(BuildContext context) {
+    final theme = Theme.of(context);
+    
+    return InkWell(
+      onTap: () => Navigator.pushNamed(context, '/services'),
+      borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
+      child: Container(
+        height: 220,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
+          boxShadow: [
+            BoxShadow(
+              color: BuddyTheme.accentColor.withOpacity(0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
+              child: CachedNetworkImage(
+                imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=800&q=80',
+                height: 220,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Shimmer.fromColors(
+                  baseColor: theme.colorScheme.surfaceVariant,
+                  highlightColor: theme.colorScheme.surface,
+                  child: Container(height: 220, color: theme.colorScheme.surfaceVariant),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  height: 220,
+                  color: theme.colorScheme.surfaceVariant,
+                  child: Icon(Icons.room_service, color: BuddyTheme.accentColor, size: 50),
+                ),
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusLg),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.black.withOpacity(0.3), Colors.black.withOpacity(0.8)],
+                ),
+              ),
+            ),
+            // Main content at the bottom
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Discover Nearby\nAmenities & More',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Service highlights
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _buildServiceChip('📚 Library', BuddyTheme.primaryColor),
+                      _buildServiceChip('🍽️ Mess', BuddyTheme.successColor),
+                      _buildServiceChip('☕ Cafe', BuddyTheme.accentColor),
+                      _buildServiceChip('🎯 More', BuddyTheme.secondaryColor),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Colors.white.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      'Explore Services →',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildServiceChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 20,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [BuddyTheme.primaryColor, BuddyTheme.secondaryColor],
+            ),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: theme.textTheme.titleLarge!.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+            fontSize: 20,
+          ),
+        ),
+      ],
     );
   }
 }
 
-List<Map<dynamic, dynamic>> _featuredProperties = [];
-bool _isLoadingProperties = true;
+class _BannerCarouselWidget extends StatefulWidget {
+  final List<Map<String, dynamic>> banners;
+  final ThemeData theme;
 
-List<Map<dynamic, dynamic>> _featuredFlatmates = [];
-bool _isLoadingFlatmates = true;
+  const _BannerCarouselWidget({
+    required this.banners,
+    required this.theme,
+  });
+
+  @override
+  State<_BannerCarouselWidget> createState() => _BannerCarouselWidgetState();
+}
+
+class _BannerCarouselWidgetState extends State<_BannerCarouselWidget> {
+  final PageController _pageController = PageController();
+  int _currentIndex = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startAutoScroll();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _startAutoScroll() {
+    _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (mounted && _pageController.hasClients) {
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          height: 120,
+          margin: const EdgeInsets.symmetric(horizontal: 1),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: PageView.builder(
+            controller: _pageController,
+            onPageChanged: (index) {
+              setState(() {
+                _currentIndex = index % widget.banners.length;
+              });
+            },
+            itemCount: null, // Infinite scroll
+            itemBuilder: (context, index) {
+              final bannerIndex = index % widget.banners.length;
+              final banner = widget.banners[bannerIndex];
+              return Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Theme.of(context).cardColor,
+                ),
+                child: Stack(
+                  children: [
+                    // Background image
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: CachedNetworkImage(
+                        imageUrl: banner['image'] as String,
+                        height: 120,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Shimmer.fromColors(
+                          baseColor: widget.theme.colorScheme.surfaceVariant,
+                          highlightColor: widget.theme.colorScheme.surface,
+                          child: Container(
+                            height: 120,
+                            color: widget.theme.colorScheme.surfaceVariant,
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          height: 120,
+                          color: widget.theme.colorScheme.surface,
+                          child: Icon(
+                            banner['icon'] as IconData,
+                            size: 40,
+                            color: widget.theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Dark overlay for better text readability
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.black.withOpacity(0.4),
+                      ),
+                    ),
+                    // Content
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  banner['title'] as String,
+                                  style: widget.theme.textTheme.titleLarge?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  banner['subtitle'] as String,
+                                  style: widget.theme.textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            banner['icon'] as IconData,
+                            color: Colors.white.withOpacity(0.9),
+                            size: 32,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Page indicators
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            widget.banners.length,
+            (index) => AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              height: 4,
+              width: _currentIndex == index ? 16 : 4,
+              decoration: BoxDecoration(
+                color: _currentIndex == index
+                    ? BuddyTheme.primaryColor
+                    : BuddyTheme.primaryColor.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}

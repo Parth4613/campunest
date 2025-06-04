@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import './display pages/property_details.dart';
 
 class MyListingsPage extends StatefulWidget {
   const MyListingsPage({Key? key}) : super(key: key);
@@ -10,7 +11,7 @@ class MyListingsPage extends StatefulWidget {
 }
 
 class _MyListingsPageState extends State<MyListingsPage> {
-  List<Map<dynamic, dynamic>> _listings = [];
+  List<Map<String, dynamic>> _listings = [];
   bool _isLoading = true;
 
   @override
@@ -28,64 +29,105 @@ class _MyListingsPageState extends State<MyListingsPage> {
       return;
     }
 
-    final ref = FirebaseDatabase.instance.ref().child('room_listings');
-    final snapshot = await ref.get();
-    final List<Map<dynamic, dynamic>> myListings = [];
-    if (snapshot.exists) {
-      final data = snapshot.value as Map<dynamic, dynamic>;
-      data.forEach((key, value) {
-        final listing = Map<String, dynamic>.from(value as Map);
-        // Assuming you store user id as 'uid' in each listing
-        if (listing['uid'] == user.uid) {
-          listing['key'] = key;
-          myListings.add(listing);
-        }
+    try {
+      final querySnapshot =
+          await FirebaseFirestore.instance
+              .collection('room_listings')
+              .where('userId', isEqualTo: user.uid)
+              .get();
+
+      final myListings =
+          querySnapshot.docs.map((doc) {
+            final data = doc.data();
+            data['key'] = doc.id;
+            // Defensive mapping for location and images
+            data['location'] = data['location'] ?? data['address'] ?? '';
+            data['uploadedPhotos'] =
+                (data['uploadedPhotos'] is List)
+                    ? (data['uploadedPhotos'] as List)
+                        .whereType<String>()
+                        .toList()
+                    : (data['uploadedPhotos'] is String &&
+                        (data['uploadedPhotos'] as String).isNotEmpty)
+                    ? [data['uploadedPhotos'] as String]
+                    : (data['imageUrl'] != null &&
+                        data['imageUrl'].toString().isNotEmpty)
+                    ? [data['imageUrl'].toString()]
+                    : [];
+            return data;
+          }).toList();
+
+      setState(() {
+        _listings = myListings;
+        _isLoading = false;
       });
+    } catch (e) {
+      setState(() {
+        _listings = [];
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load listings: $e')));
     }
-    setState(() {
-      _listings = myListings;
-      _isLoading = false;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Listings'),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _listings.isEmpty
+      appBar: AppBar(title: const Text('My Listings')),
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _listings.isEmpty
               ? const Center(child: Text('No listings found.'))
               : ListView.builder(
-                  itemCount: _listings.length,
-                  itemBuilder: (context, index) {
-                    final listing = _listings[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        leading: listing['uploadedPhotos'] != null &&
-                                (listing['uploadedPhotos'] as List).isNotEmpty
-                            ? Image.network(
-                                listing['uploadedPhotos'][0],
+                itemCount: _listings.length,
+                itemBuilder: (context, index) {
+                  final listing = _listings[index];
+                  final images =
+                      (listing['uploadedPhotos'] is List &&
+                              (listing['uploadedPhotos'] as List).isNotEmpty)
+                          ? listing['uploadedPhotos']
+                          : [listing['imageUrl'] ?? ''];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: ListTile(
+                      leading:
+                          images.isNotEmpty &&
+                                  images[0] != null &&
+                                  images[0].toString().isNotEmpty
+                              ? Image.network(
+                                images[0],
                                 width: 60,
                                 height: 60,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    const Icon(Icons.image_not_supported),
+                                errorBuilder:
+                                    (context, error, stackTrace) =>
+                                        const Icon(Icons.image_not_supported),
                               )
-                            : const Icon(Icons.home, size: 40),
-                        title: Text(listing['title'] ?? 'No Title'),
-                        subtitle: Text(listing['location'] ?? ''),
-                        trailing: Text('₹${listing['rent'] ?? '-'}'),
-                        onTap: () {
-                          // Optionally, navigate to details page
-                        },
-                      ),
-                    );
-                  },
-                ),
+                              : const Icon(Icons.home, size: 40),
+                      title: Text(listing['title'] ?? 'No Title'),
+                      subtitle: Text(listing['location'] ?? ''),
+                      trailing: Text('₹${listing['rent'] ?? '-'}'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => PropertyDetailsScreen(
+                                  propertyId: listing['key'],
+                                ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
     );
   }
 }
