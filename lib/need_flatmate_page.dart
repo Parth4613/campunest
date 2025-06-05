@@ -404,6 +404,9 @@ class _NeedFlatmatePageState extends State<NeedFlatmatePage> {
     Color cardColor,
     Color labelColor,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color accentColor =
+        isDark ? const Color(0xFF64B5F6) : const Color(0xFF4299E1);
     return Container(
       decoration: BuddyTheme.cardDecoration.copyWith(color: cardColor),
       child: Padding(
@@ -458,7 +461,7 @@ class _NeedFlatmatePageState extends State<NeedFlatmatePage> {
                           ),
                           const SizedBox(width: BuddyTheme.spacingXxs),
                           Text(
-                            flatmate['preferredLocation'] ?? '',
+                            flatmate['location'] ?? '',
                             style: Theme.of(context).textTheme.bodySmall!
                                 .copyWith(color: labelColor.withOpacity(0.7)),
                           ),
@@ -620,7 +623,7 @@ class _NeedFlatmatePageState extends State<NeedFlatmatePage> {
               child: ElevatedButton(
                 onPressed: () => _viewFlatmateDetails(flatmate),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: BuddyTheme.primaryColor,
+                  backgroundColor: accentColor,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(

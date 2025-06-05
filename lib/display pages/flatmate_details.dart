@@ -375,6 +375,13 @@ class FlatmateDetailsPage extends StatelessWidget {
             'Drinking',
             flatmateData['drinkingPreference'] ?? 'No preference',
           ),
+          Divider(height: BuddyTheme.spacingLg),
+          _buildPreferenceRow(
+            theme,
+            Icons.bedroom_parent,
+            'Flat Size Preference',
+            flatmateData['preferredRoomSize'] ?? 'No preference',
+          ),
         ],
       ),
     );

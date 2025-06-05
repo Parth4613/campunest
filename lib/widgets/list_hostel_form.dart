@@ -1,14 +1,14 @@
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme.dart';
 import '../models/room_type.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Add this import at the top
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/cloudinary_service.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ListHostelForm extends StatefulWidget {
-  ListHostelForm({Key? key}) : super(key: key) {
-  }
+  ListHostelForm({Key? key}) : super(key: key) {}
 
   @override
   State<ListHostelForm> createState() => _ListHostelFormState();
@@ -94,7 +94,8 @@ class _ListHostelFormState extends State<ListHostelForm>
   String _bookingMode = 'Call';
 
   // Photos
-  List<String> _uploadedPhotos = [];
+  Map<String, String> _uploadedPhotos = {};
+  final imagePicker = ImagePicker();
   final List<String> _requiredPhotoTypes = [
     'Room',
     'Washroom',
@@ -221,8 +222,68 @@ class _ListHostelFormState extends State<ListHostelForm>
     _slideAnimationController.forward();
   }
 
+  // Add this function for uploading a single photo to Cloudinary
+  Future<String?> _uploadPhotoToCloudinary(String imagePath) async {
+    try {
+      return await CloudinaryService.uploadImage(imagePath);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return null;
+    }
+  }
+
+  // Update this function to handle image picking and uploading
+  Future<void> _pickAndUploadPhoto(String photoType) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (picked != null) {
+      final url = await _uploadPhotoToCloudinary(picked.path);
+      if (url != null) {
+        setState(() {
+          _uploadedPhotos[photoType] = url;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Image uploaded successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
+
   void _submitForm() async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
+
+    // Plan expiry logic
+    Duration planDuration;
+    switch (_selectedPlan) {
+      case '1Day':
+        planDuration = const Duration(days: 1);
+        break;
+      case '7Day':
+        planDuration = const Duration(days: 7);
+        break;
+      case '15Day':
+        planDuration = const Duration(days: 15);
+        break;
+      case '1Month':
+        planDuration = const Duration(days: 30);
+        break;
+      default:
+        planDuration = const Duration(days: 1);
+    }
+    final now = DateTime.now();
+    final expiryDate = now.add(planDuration);
+
     final data = {
       'uid': userId,
       'title': _titleController.text,
@@ -257,13 +318,18 @@ class _ListHostelFormState extends State<ListHostelForm>
       'availableFromDate': _availableFromDate?.toIso8601String(),
       'minimumStay': _minimumStay,
       'bookingMode': _bookingMode,
-      'uploadedPhotos': _uploadedPhotos,
+      'uploadedPhotos': _uploadedPhotos, // Now contains Cloudinary URLs
       'description': _descriptionController.text,
       'offers': _offersController.text,
       'specialFeatures': _specialFeaturesController.text,
       'createdAt': DateTime.now().toIso8601String(),
       'imageUrl':
-          'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=800&q=80',
+          _uploadedPhotos.isNotEmpty
+              ? _uploadedPhotos.values.first
+              : 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=800&q=80',
+      'selectedPlan': _selectedPlan,
+      'expiryDate': expiryDate.toIso8601String(),
+      'visibility': true,
     };
 
     try {
@@ -294,11 +360,13 @@ class _ListHostelFormState extends State<ListHostelForm>
   Widget build(BuildContext context) {
     theme = Theme.of(context);
     scaffoldBg = theme.scaffoldBackgroundColor;
-    cardColor = theme.brightness == Brightness.dark
-        ? const Color(0xFF23262F)
-        : const Color.fromARGB(255, 226, 227, 231);
+    cardColor =
+        theme.brightness == Brightness.dark
+            ? const Color(0xFF23262F)
+            : const Color.fromARGB(255, 226, 227, 231);
     textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
-    textSecondary = theme.textTheme.bodyMedium?.color?.withOpacity(0.7) ?? Colors.black54;
+    textSecondary =
+        theme.textTheme.bodyMedium?.color?.withOpacity(0.7) ?? Colors.black54;
 
     return Scaffold(
       backgroundColor: scaffoldBg,
@@ -709,16 +777,22 @@ class _ListHostelFormState extends State<ListHostelForm>
               'Choose how long to keep your listing active',
             ),
             const SizedBox(height: BuddyTheme.spacingXl),
-            
-            ..._planPrices.entries.map((plan) => Padding(
-              padding: const EdgeInsets.only(bottom: BuddyTheme.spacingMd),
-              child: _buildPlanCard(
-                plan.key,
-                plan.value,
-                isSelected: _selectedPlan == plan.key,
-                onSelect: () => setState(() => _selectedPlan = plan.key),
-              ),
-            )).toList(),
+
+            ..._planPrices.entries
+                .map(
+                  (plan) => Padding(
+                    padding: const EdgeInsets.only(
+                      bottom: BuddyTheme.spacingMd,
+                    ),
+                    child: _buildPlanCard(
+                      plan.key,
+                      plan.value,
+                      isSelected: _selectedPlan == plan.key,
+                      onSelect: () => setState(() => _selectedPlan = plan.key),
+                    ),
+                  ),
+                )
+                .toList(),
 
             const SizedBox(height: BuddyTheme.spacingXl),
             _buildPlanInfoCard(),
@@ -728,7 +802,9 @@ class _ListHostelFormState extends State<ListHostelForm>
     );
   }
 
-  Widget _buildPlanCard(String planName, double price, {
+  Widget _buildPlanCard(
+    String planName,
+    double price, {
     required bool isSelected,
     required VoidCallback onSelect,
   }) {
@@ -752,10 +828,18 @@ class _ListHostelFormState extends State<ListHostelForm>
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.all(BuddyTheme.spacingMd),
                   decoration: BoxDecoration(
-                    color: isSelected ? BuddyTheme.primaryColor.withOpacity(0.1) : cardColor,
-                    borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
+                    color:
+                        isSelected
+                            ? BuddyTheme.primaryColor.withOpacity(0.1)
+                            : cardColor,
+                    borderRadius: BorderRadius.circular(
+                      BuddyTheme.borderRadiusMd,
+                    ),
                     border: Border.all(
-                      color: isSelected ? BuddyTheme.primaryColor : Colors.grey.withOpacity(0.3),
+                      color:
+                          isSelected
+                              ? BuddyTheme.primaryColor
+                              : Colors.grey.withOpacity(0.3),
                       width: isSelected ? 2 : 1,
                     ),
                     boxShadow: [
@@ -770,7 +854,8 @@ class _ListHostelFormState extends State<ListHostelForm>
                     children: [
                       Icon(
                         Icons.access_time,
-                        color: isSelected ? BuddyTheme.primaryColor : Colors.grey,
+                        color:
+                            isSelected ? BuddyTheme.primaryColor : Colors.grey,
                       ),
                       const SizedBox(width: BuddyTheme.spacingMd),
                       Expanded(
@@ -780,7 +865,10 @@ class _ListHostelFormState extends State<ListHostelForm>
                             Text(
                               duration,
                               style: TextStyle(
-                                color: isSelected ? BuddyTheme.primaryColor : textPrimary,
+                                color:
+                                    isSelected
+                                        ? BuddyTheme.primaryColor
+                                        : textPrimary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -798,7 +886,10 @@ class _ListHostelFormState extends State<ListHostelForm>
                       Text(
                         formattedPrice,
                         style: TextStyle(
-                          color: isSelected ? BuddyTheme.primaryColor : textPrimary,
+                          color:
+                              isSelected
+                                  ? BuddyTheme.primaryColor
+                                  : textPrimary,
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                         ),
@@ -809,7 +900,7 @@ class _ListHostelFormState extends State<ListHostelForm>
               ),
             ),
           ),
-          );
+        );
       },
     );
   }
@@ -827,19 +918,14 @@ class _ListHostelFormState extends State<ListHostelForm>
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(BuddyTheme.borderRadiusMd),
-        border: Border.all(
-          color: BuddyTheme.primaryColor.withOpacity(0.3),
-        ),
+        border: Border.all(color: BuddyTheme.primaryColor.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                Icons.info_outline,
-                color: BuddyTheme.primaryColor,
-              ),
+              Icon(Icons.info_outline, color: BuddyTheme.primaryColor),
               const SizedBox(width: BuddyTheme.spacingSm),
               Text(
                 'Plan Benefits',
@@ -863,7 +949,7 @@ class _ListHostelFormState extends State<ListHostelForm>
       ),
     );
   }
-  
+
   Widget _buildPreviewStep() {
     return _buildStepContainer(
       child: SingleChildScrollView(
@@ -966,7 +1052,7 @@ class _ListHostelFormState extends State<ListHostelForm>
               ),
             ),
           ),
-          );
+        );
       },
     );
   }
@@ -1067,7 +1153,7 @@ class _ListHostelFormState extends State<ListHostelForm>
               ),
             ),
           ),
-          );
+        );
       },
     );
   }
@@ -1130,7 +1216,7 @@ class _ListHostelFormState extends State<ListHostelForm>
               ),
             ),
           ),
-          );
+        );
       },
     );
   }
@@ -1273,7 +1359,7 @@ class _ListHostelFormState extends State<ListHostelForm>
               ),
             ),
           ),
-          );
+        );
       },
     );
   }
@@ -1322,7 +1408,7 @@ class _ListHostelFormState extends State<ListHostelForm>
               ),
             ),
           ),
-          );
+        );
       },
     );
   }
@@ -1490,7 +1576,7 @@ class _ListHostelFormState extends State<ListHostelForm>
               ),
             ),
           ),
-          );
+        );
       },
     );
   }
@@ -1631,142 +1717,150 @@ class _ListHostelFormState extends State<ListHostelForm>
               ),
             ),
           ),
-          );
+        );
       },
     );
   }
 
   Widget _buildPhotoUploadSection() {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        'Property Photos',
-        style: theme.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: textPrimary,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Property Photos',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: textPrimary,
+          ),
         ),
-      ),
-      const SizedBox(height: BuddyTheme.spacingSm),
-      Text(
-        'Add photos of different areas (${_uploadedPhotos.length} uploaded)',
-        style: theme.textTheme.bodySmall?.copyWith(color: textSecondary),
-      ),
-      const SizedBox(height: BuddyTheme.spacingMd),
-      GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 1.2,
-          crossAxisSpacing: BuddyTheme.spacingSm,
-          mainAxisSpacing: BuddyTheme.spacingSm,
+        const SizedBox(height: BuddyTheme.spacingSm),
+        Text(
+          'Add photos of different areas (${_uploadedPhotos.length} uploaded)',
+          style: theme.textTheme.bodySmall?.copyWith(color: textSecondary),
         ),
-        itemCount: _requiredPhotoTypes.length,
-        itemBuilder: (context, index) {
-          String photoType = _requiredPhotoTypes[index];
-          bool hasPhoto = _uploadedPhotos.contains(photoType);
+        const SizedBox(height: BuddyTheme.spacingMd),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 1.2,
+            crossAxisSpacing: BuddyTheme.spacingSm,
+            mainAxisSpacing: BuddyTheme.spacingSm,
+          ),
+          itemCount: _requiredPhotoTypes.length,
+          itemBuilder: (context, index) {
+            String photoType = _requiredPhotoTypes[index];
+            String? photoUrl = _uploadedPhotos[photoType];
 
-          return TweenAnimationBuilder<double>(
-            duration: Duration(milliseconds: 300 + (index * 100)),
-            tween: Tween(begin: 0.0, end: 1.0),
-            builder: (context, value, child) {
-              return Transform.scale(
-                scale: 0.8 + (0.2 * value),
-                child: Opacity(
-                  opacity: value,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          if (hasPhoto) {
-                            _uploadedPhotos.remove(photoType);
-                          } else {
-                            _uploadedPhotos.add(photoType);
-                          }
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(
-                        BuddyTheme.borderRadiusMd,
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: hasPhoto
-                              ? BuddyTheme.primaryColor.withOpacity(0.1)
-                              : cardColor,
-                          borderRadius: BorderRadius.circular(
-                            BuddyTheme.borderRadiusMd,
-                          ),
-                          border: Border.all(
-                            color: hasPhoto
-                                ? BuddyTheme.primaryColor
-                                : BuddyTheme.borderColor,
-                            style: hasPhoto
-                                ? BorderStyle.solid
-                                : BorderStyle.none,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
+            return TweenAnimationBuilder<double>(
+              duration: Duration(milliseconds: 300 + (index * 100)),
+              tween: Tween(begin: 0.0, end: 1.0),
+              builder: (context, value, child) {
+                return Transform.scale(
+                  scale: 0.8 + (0.2 * value),
+                  child: Opacity(
+                    opacity: value,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _pickAndUploadPhoto(photoType),
+                        borderRadius: BorderRadius.circular(
+                          BuddyTheme.borderRadiusMd,
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              child: Icon(
-                                hasPhoto
-                                    ? Icons.check_circle
-                                    : Icons.add_a_photo_outlined,
-                                key: ValueKey(hasPhoto),
-                                size: 32,
-                                color: hasPhoto
-                                    ? BuddyTheme.primaryColor
-                                    : textSecondary,
-                              ),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color:
+                                photoUrl != null
+                                    ? BuddyTheme.primaryColor.withOpacity(0.1)
+                                    : cardColor,
+                            borderRadius: BorderRadius.circular(
+                              BuddyTheme.borderRadiusMd,
                             ),
-                            const SizedBox(height: BuddyTheme.spacingSm),
-                            Text(
-                              photoType,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: hasPhoto
-                                    ? BuddyTheme.primaryColor
-                                    : textSecondary,
-                                fontWeight: hasPhoto
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                              ),
+                            border: Border.all(
+                              color:
+                                  photoUrl != null
+                                      ? BuddyTheme.primaryColor
+                                      : BuddyTheme.borderColor,
+                              style:
+                                  photoUrl != null
+                                      ? BorderStyle.solid
+                                      : BorderStyle.none,
                             ),
-                            if (hasPhoto) ...[
-                              const SizedBox(height: BuddyTheme.spacingXs),
-                              Text(
-                                'Tap to remove',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: textSecondary,
-                                  fontSize: 10,
-                                ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
                               ),
                             ],
-                          ],
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (photoUrl != null)
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(
+                                      BuddyTheme.borderRadiusSm,
+                                    ),
+                                    child: Image.network(
+                                      photoUrl,
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Icon(
+                                                Icons.broken_image,
+                                                size: 32,
+                                              ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                Icon(
+                                  Icons.add_a_photo_outlined,
+                                  size: 32,
+                                  color: textSecondary,
+                                ),
+                              const SizedBox(height: BuddyTheme.spacingSm),
+                              Text(
+                                photoType,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color:
+                                      photoUrl != null
+                                          ? BuddyTheme.primaryColor
+                                          : textSecondary,
+                                  fontWeight:
+                                      photoUrl != null
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                ),
+                              ),
+                              if (photoUrl != null) ...[
+                                const SizedBox(height: BuddyTheme.spacingXs),
+                                Text(
+                                  'Tap to change',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: textSecondary,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    ],
-  );
-}
-
+                );
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
 
   Widget _buildPreviewCard() {
     return TweenAnimationBuilder<double>(
@@ -1929,7 +2023,7 @@ class _ListHostelFormState extends State<ListHostelForm>
               ),
             ),
           ),
-          );
+        );
       },
     );
   }
@@ -2028,12 +2122,6 @@ class _ListHostelFormState extends State<ListHostelForm>
     // Implement your photo upload logic here
     // This is just a placeholder
     print('Uploading photo for: $photoType');
-  }
-
-  void _removePhoto(int index) {
-    setState(() {
-      _uploadedPhotos.removeAt(index);
-    });
   }
 
   Widget _buildNavigationButtons() {

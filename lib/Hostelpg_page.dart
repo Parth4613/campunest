@@ -53,7 +53,7 @@ class _HostelPgPageState extends State<HostelPgPage> {
       final querySnapshot =
           await FirebaseFirestore.instance
               .collection('hostel_listings')
-              .orderBy('createdAt', descending: true)
+              .where('visibility', isEqualTo: true) // Only visible hostels
               .get();
 
       final List<Map<String, dynamic>> loadedHostels = [];
@@ -67,7 +67,15 @@ class _HostelPgPageState extends State<HostelPgPage> {
           'type': v['hostelType'] ?? '',
           'amenities': v['facilities'] ?? [],
           'imageUrl':
-              (v['uploadedPhotos'] is List &&
+              (v['uploadedPhotos'] is Map &&
+                      (v['uploadedPhotos'] as Map).containsKey(
+                        'Building Front',
+                      ))
+                  ? (v['uploadedPhotos'] as Map)['Building Front']
+                  : (v['uploadedPhotos'] is Map &&
+                      (v['uploadedPhotos'] as Map).isNotEmpty)
+                  ? (v['uploadedPhotos'] as Map).values.first
+                  : (v['uploadedPhotos'] is List &&
                       (v['uploadedPhotos'] as List).isNotEmpty)
                   ? v['uploadedPhotos'][0]
                   : '',
@@ -624,54 +632,6 @@ class _HostelPgPageState extends State<HostelPgPage> {
                     fontSize: 14,
                     color: textSecondary,
                     fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Type: ${hostel['hostelType'] ?? ''} | For: ${hostel['hostelFor'] ?? ''}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: textLight,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (facilities.isNotEmpty)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children:
-                        facilities
-                            .map<Widget>(
-                              (facility) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: backgroundColor,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: borderColor),
-                                ),
-                                child: Text(
-                                  facility.toString(),
-                                  style: TextStyle(
-                                    color: textSecondary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                  ),
-                const SizedBox(height: 12),
-                Text(
-                  'Rent: ₹${hostel['price']}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: primaryColor,
-                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 12),
