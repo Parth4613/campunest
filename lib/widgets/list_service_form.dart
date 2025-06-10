@@ -32,12 +32,9 @@ class _ListServiceFormState extends State<ListServiceForm>
   final _formKey = GlobalKey<FormState>();
 
   String _selectedPlan = '1Day';
-  final Map<String, int> _planPrices = {
-    '1Day': 29,
-    '7Day': 149,
-    '15Day': 239,
-    '1Month': 499,
-  };
+  Map<String, Map<String, double>> _planPrices = {};
+  bool _isPlanPricesLoading = true;
+  String? _planPricesError;
 
   // Basic Service Details
   String _serviceType = 'Library';
@@ -70,17 +67,17 @@ class _ListServiceFormState extends State<ListServiceForm>
   bool _hasPowerSockets = true;
 
   // Mess-specific fields
-  String _foodType = 'Both';
+  String _foodType =
+      'Veg and Non-Veg'; // Changed from 'Both' to match the options
   final _monthlyPriceController = TextEditingController();
   Map<String, bool> _mealTimings = {
-    'Breakfast': true,
-    'Lunch': true,
-    'Dinner': true,
+    'Breakfast': false,
+    'Lunch': false,
+    'Dinner': false,
   };
   bool _hasHomeDelivery = false;
   bool _hasTiffinService = false;
   // Other service fields
-  final _shortDescriptionController = TextEditingController();
   final _pricingController = TextEditingController();
   final _serviceTypeOtherController = TextEditingController();
   final _usefulnessController = TextEditingController();
@@ -112,6 +109,7 @@ class _ListServiceFormState extends State<ListServiceForm>
   void initState() {
     super.initState();
     _pageController = PageController();
+    _fetchPlanPrices();
 
     // Add listener to sync page changes with step counter
     _pageController.addListener(() {
@@ -170,11 +168,63 @@ class _ListServiceFormState extends State<ListServiceForm>
     _chargesController.dispose();
     _priceRangeController.dispose();
     _monthlyPriceController.dispose();
-    _shortDescriptionController.dispose();
     _pricingController.dispose();
     _serviceTypeOtherController.dispose();
     _usefulnessController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchPlanPrices() async {
+    setState(() {
+      _isPlanPricesLoading = true;
+      _planPricesError = null;
+    });
+    try {
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('plan_prices')
+              .doc('list_service')
+              .collection('day_wise_prices')
+              .get();
+      Map<String, Map<String, double>> prices = {};
+      for (var d in doc.docs) {
+        final data = d.data();
+        double? actual =
+            (data['actual_price'] is int)
+                ? (data['actual_price'] as int).toDouble()
+                : (data['actual_price'] as num?)?.toDouble();
+        double? discounted =
+            (data['discounted_price'] is int)
+                ? (data['discounted_price'] as int).toDouble()
+                : (data['discounted_price'] as num?)?.toDouble();
+        prices[d.id] = {'actual': actual ?? 0, 'discounted': discounted ?? 0};
+      }
+      // Map Firestore keys to your plan keys
+      Map<String, String> firestoreToPlanKey = {
+        '1 day': '1Day',
+        '7 days': '7Day',
+        '15 days': '15Day',
+        '1 month': '1Month',
+      };
+      Map<String, Map<String, double>> mappedPrices = {};
+      firestoreToPlanKey.forEach((firestoreKey, planKey) {
+        if (prices.containsKey(firestoreKey)) {
+          mappedPrices[planKey] = prices[firestoreKey]!;
+        }
+      });
+      setState(() {
+        _planPrices = mappedPrices;
+        _isPlanPricesLoading = false;
+        if (_planPrices.isNotEmpty && !_planPrices.containsKey(_selectedPlan)) {
+          _selectedPlan = _planPrices.keys.first;
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _planPricesError = 'Failed to load plan prices';
+        _isPlanPricesLoading = false;
+      });
+    }
   }
 
   void _nextStep() {
@@ -284,7 +334,7 @@ class _ListServiceFormState extends State<ListServiceForm>
       // Library-specific
       if (_serviceType == 'Library') ...{
         'libraryType': _libraryType,
-        'seatingCapacity': _seatingCapacityController.text,
+        'seatingCapacity': int.tryParse(_seatingCapacityController.text) ?? 0,
         'acStatus': _acStatus,
         'charges': _chargesController.text,
         'chargeType': _chargeType,
@@ -302,14 +352,14 @@ class _ListServiceFormState extends State<ListServiceForm>
       // Mess-specific
       if (_serviceType == 'Mess') ...{
         'foodType': _foodType,
-        'monthlyPrice': _monthlyPriceController.text,
+        'charges': _monthlyPriceController.text,
+        'seatingCapacity': int.tryParse(_seatingCapacityController.text) ?? 0,
         'mealTimings': _mealTimings,
         'hasHomeDelivery': _hasHomeDelivery,
         'hasTiffinService': _hasTiffinService,
       },
       // Other
       if (_serviceType == 'Other') ...{
-        'shortDescription': _shortDescriptionController.text,
         'pricing': _pricingController.text,
         'serviceTypeOther': _serviceTypeOtherController.text,
         'usefulness': _usefulnessController.text,
@@ -650,23 +700,40 @@ class _ListServiceFormState extends State<ListServiceForm>
               'Choose how long to keep your listing active',
             ),
             const SizedBox(height: BuddyTheme.spacingXl),
-
-            ..._planPrices.entries
-                .map(
-                  (plan) => Padding(
-                    padding: const EdgeInsets.only(
-                      bottom: BuddyTheme.spacingMd,
+            if (_isPlanPricesLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_planPricesError != null)
+              Center(
+                child: Text(
+                  _planPricesError!,
+                  style: TextStyle(color: Colors.red),
+                ),
+              )
+            else if (_planPrices.isEmpty)
+              Center(
+                child: Text(
+                  'No plans available',
+                  style: TextStyle(color: Colors.red),
+                ),
+              )
+            else
+              ..._planPrices.entries
+                  .map(
+                    (plan) => Padding(
+                      padding: const EdgeInsets.only(
+                        bottom: BuddyTheme.spacingMd,
+                      ),
+                      child: _buildPlanCard(
+                        plan.key,
+                        plan.value['actual'] ?? 0,
+                        discountedPrice: plan.value['discounted'] ?? 0,
+                        isSelected: _selectedPlan == plan.key,
+                        onSelect:
+                            () => setState(() => _selectedPlan = plan.key),
+                      ),
                     ),
-                    child: _buildPlanCard(
-                      plan.key,
-                      plan.value.toDouble(),
-                      isSelected: _selectedPlan == plan.key,
-                      onSelect: () => setState(() => _selectedPlan = plan.key),
-                    ),
-                  ),
-                )
-                .toList(),
-
+                  )
+                  .toList(),
             const SizedBox(height: BuddyTheme.spacingXl),
             _buildPlanInfoCard(),
           ],
@@ -677,13 +744,16 @@ class _ListServiceFormState extends State<ListServiceForm>
 
   Widget _buildPlanCard(
     String planName,
-    double price, {
+    double actualPrice, {
+    double discountedPrice = 0,
     required bool isSelected,
     required VoidCallback onSelect,
   }) {
     String duration = planName;
-    String formattedPrice = '₹${price.toStringAsFixed(0)}';
-
+    bool hasDiscount = discountedPrice > 0 && discountedPrice < actualPrice;
+    String formattedActual = '₹${actualPrice.toStringAsFixed(0)}';
+    String formattedDiscounted =
+        hasDiscount ? '₹${discountedPrice.toStringAsFixed(0)}' : '';
     return TweenAnimationBuilder<double>(
       duration: const Duration(milliseconds: 600),
       tween: Tween(begin: 0.0, end: 1.0),
@@ -715,13 +785,6 @@ class _ListServiceFormState extends State<ListServiceForm>
                               : Colors.grey.withOpacity(0.3),
                       width: isSelected ? 2 : 1,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
                   child: Row(
                     children: [
@@ -756,17 +819,41 @@ class _ListServiceFormState extends State<ListServiceForm>
                           ],
                         ),
                       ),
-                      Text(
-                        formattedPrice,
-                        style: TextStyle(
-                          color:
-                              isSelected
-                                  ? BuddyTheme.primaryColor
-                                  : textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                      if (hasDiscount) ...[
+                        Text(
+                          formattedDiscounted,
+                          style: TextStyle(
+                            color:
+                                isSelected
+                                    ? BuddyTheme.primaryColor
+                                    : Colors.green,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Text(
+                          formattedActual,
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                      ] else ...[
+                        Text(
+                          formattedActual,
+                          style: TextStyle(
+                            color:
+                                isSelected
+                                    ? BuddyTheme.primaryColor
+                                    : textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1144,6 +1231,19 @@ class _ListServiceFormState extends State<ListServiceForm>
           hint: 'Number of seats available',
           icon: Icons.event_seat,
           keyboardType: TextInputType.number,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter seating capacity';
+            }
+            final intValue = int.tryParse(value);
+            if (intValue == null) {
+              return 'Please enter a valid number';
+            }
+            if (intValue <= 0) {
+              return 'Seating capacity must be greater than 0';
+            }
+            return null;
+          },
         ),
         const SizedBox(height: BuddyTheme.spacingLg),
         _buildSelectionCard(
@@ -1232,15 +1332,40 @@ class _ListServiceFormState extends State<ListServiceForm>
         _buildSelectionCard(
           'Food Type',
           _foodType,
-          ['Veg', 'Non-Veg', 'Both'],
-          (value) => setState(() => _foodType = value),
+          ['Veg', 'Non-Veg', 'Veg and Non-Veg'],
+          (String value) {
+            setState(() {
+              _foodType = value;
+            });
+          },
           Icons.restaurant_menu,
         ),
         const SizedBox(height: BuddyTheme.spacingLg),
         _buildAnimatedTextField(
+          controller: _seatingCapacityController,
+          label: 'Seating Capacity',
+          hint: 'Number of seats available',
+          icon: Icons.event_seat,
+          keyboardType: TextInputType.number,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter seating capacity';
+            }
+            final intValue = int.tryParse(value);
+            if (intValue == null) {
+              return 'Please enter a valid number';
+            }
+            if (intValue <= 0) {
+              return 'Seating capacity must be greater than 0';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: BuddyTheme.spacingLg),
+        _buildAnimatedTextField(
           controller: _monthlyPriceController,
-          label: 'Monthly Subscription Price (₹)',
-          hint: 'Enter monthly subscription cost',
+          label: 'Monthly Price (₹)',
+          hint: 'Enter monthly amount',
           icon: Icons.currency_rupee,
           keyboardType: TextInputType.number,
         ),
@@ -1249,7 +1374,7 @@ class _ListServiceFormState extends State<ListServiceForm>
         const SizedBox(height: BuddyTheme.spacingLg),
         _buildSwitchCard(
           'Home Delivery',
-          'Door-to-door meal delivery',
+          'Food delivery service available',
           _hasHomeDelivery,
           (value) => setState(() => _hasHomeDelivery = value),
           Icons.delivery_dining,
@@ -1257,7 +1382,7 @@ class _ListServiceFormState extends State<ListServiceForm>
         const SizedBox(height: BuddyTheme.spacingLg),
         _buildSwitchCard(
           'Tiffin Service',
-          'Packed meal service available',
+          'Tiffin packing service available',
           _hasTiffinService,
           (value) => setState(() => _hasTiffinService = value),
           Icons.bakery_dining,
@@ -1269,14 +1394,6 @@ class _ListServiceFormState extends State<ListServiceForm>
   Widget _buildOtherDetails() {
     return Column(
       children: [
-        _buildAnimatedTextField(
-          controller: _shortDescriptionController,
-          label: 'Short Description',
-          hint: 'Describe your service briefly',
-          icon: Icons.description_outlined,
-          maxLines: 3,
-        ),
-        const SizedBox(height: BuddyTheme.spacingLg),
         _buildAnimatedTextField(
           controller: _pricingController,
           label: 'Pricing',
@@ -1294,7 +1411,7 @@ class _ListServiceFormState extends State<ListServiceForm>
         const SizedBox(height: BuddyTheme.spacingLg),
         _buildAnimatedTextField(
           controller: _usefulnessController,
-          label: 'Usefulness for Students',
+          label: 'Usefulness for Students/Flat Seekers',
           hint: 'How does this help flat seekers/students?',
           icon: Icons.school_outlined,
           maxLines: 3,
@@ -1575,11 +1692,23 @@ class _ListServiceFormState extends State<ListServiceForm>
             children: [
               Icon(Icons.restaurant_menu, color: BuddyTheme.primaryColor),
               const SizedBox(width: BuddyTheme.spacingSm),
-              Text(
-                'Meal Timings',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Meals',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '(Select the meals provided by you)',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: BuddyTheme.textSecondaryColor,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1604,12 +1733,11 @@ class _ListServiceFormState extends State<ListServiceForm>
                         color:
                             entry.value
                                 ? BuddyTheme.primaryColor
-                                : Colors.transparent,
+                                : BuddyTheme.primaryColor.withOpacity(0.1),
                         border: Border.all(
-                          color:
-                              entry.value
-                                  ? BuddyTheme.primaryColor
-                                  : BuddyTheme.borderColor,
+                          color: BuddyTheme.primaryColor.withOpacity(
+                            entry.value ? 1 : 0.3,
+                          ),
                         ),
                         borderRadius: BorderRadius.circular(
                           BuddyTheme.borderRadiusSm,
@@ -1621,9 +1749,8 @@ class _ListServiceFormState extends State<ListServiceForm>
                           color:
                               entry.value
                                   ? Colors.white
-                                  : BuddyTheme.textPrimaryColor,
-                          fontWeight:
-                              entry.value ? FontWeight.w600 : FontWeight.normal,
+                                  : BuddyTheme.primaryColor,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -1738,6 +1865,7 @@ class _ListServiceFormState extends State<ListServiceForm>
     required IconData icon,
     TextInputType? keyboardType,
     int maxLines = 1,
+    String? Function(String?)? validator,
   }) {
     return TweenAnimationBuilder<double>(
       duration: const Duration(milliseconds: 500),
@@ -1763,12 +1891,14 @@ class _ListServiceFormState extends State<ListServiceForm>
                 controller: controller,
                 keyboardType: keyboardType,
                 maxLines: maxLines,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'This field is required';
-                  }
-                  return null;
-                },
+                validator:
+                    validator ??
+                    (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'This field is required';
+                      }
+                      return null;
+                    },
                 style: TextStyle(color: textPrimary),
                 decoration: InputDecoration(
                   labelText: label,

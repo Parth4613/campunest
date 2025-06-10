@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'display pages/service_details.dart';
 import 'theme.dart';
+import 'display pages/service_details.dart';
 
 class ServicesPage extends StatefulWidget {
   const ServicesPage({Key? key}) : super(key: key);
@@ -204,15 +206,6 @@ class _ServicesPageState extends State<ServicesPage> {
                             textPrimary,
                             borderColor,
                           ),
-                          const SizedBox(height: BuddyTheme.spacingMd),
-                          _buildQuickStats(
-                            cardColor,
-                            accentColor,
-                            successColor,
-                            warningColor,
-                            borderColor,
-                            textSecondary,
-                          ),
                           const SizedBox(height: BuddyTheme.spacingLg),
                           _buildSectionHeader(
                             'Available Services',
@@ -385,89 +378,6 @@ class _ServicesPageState extends State<ServicesPage> {
     );
   }
 
-  Widget _buildQuickStats(
-    Color cardColor,
-    Color accentColor,
-    Color successColor,
-    Color warningColor,
-    Color borderColor,
-    Color textSecondary,
-  ) {
-    final openServices = _services.where((s) => _isServiceOpen(s)).length;
-    final servicesWithOffers =
-        _services.length; // All services have offers in this example
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildStatItem(
-            '${_services.length}',
-            'Total\nServices',
-            accentColor,
-            textSecondary,
-          ),
-          Container(width: 1, height: 40, color: borderColor),
-          _buildStatItem(
-            '$openServices',
-            'Open\nNow',
-            successColor,
-            textSecondary,
-          ),
-          Container(width: 1, height: 40, color: borderColor),
-          _buildStatItem(
-            '$servicesWithOffers',
-            'Special\nOffers',
-            warningColor,
-            textSecondary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(
-    String number,
-    String label,
-    Color color,
-    Color textSecondary,
-  ) {
-    return Column(
-      children: [
-        Text(
-          number,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: textSecondary,
-            fontWeight: FontWeight.w500,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
   Widget _buildSectionHeader(String title, Color textPrimary) {
     return Text(
       title,
@@ -494,8 +404,11 @@ class _ServicesPageState extends State<ServicesPage> {
   ) {
     return GestureDetector(
       onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Viewing ${service['serviceName']} details')),
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ServiceDetailsScreen(serviceId: service['key']),
+          ),
         );
       },
       child: Container(
@@ -709,9 +622,13 @@ class _ServicesPageState extends State<ServicesPage> {
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            // Handle visit/enquiry - you can launch maps here
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ServiceDetailsScreen(serviceId: service['key']),
+                              ),
+                            );
                           },
-                          icon: const Icon(Icons.directions_outlined, size: 18),
                           label: const Text('View Details'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: accentColor,

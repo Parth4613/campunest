@@ -212,15 +212,6 @@ class _HostelPgPageState extends State<HostelPgPage> {
                     accentColor,
                     borderColor,
                   ),
-                  const SizedBox(height: BuddyTheme.spacingMd),
-                  _buildQuickStats(
-                    cardColor,
-                    accentColor,
-                    successColor,
-                    warningColor,
-                    borderColor,
-                    textSecondary,
-                  ),
                   const SizedBox(height: BuddyTheme.spacingLg),
                   _buildSectionHeader(
                     'Available Hostels / PG',
@@ -438,80 +429,6 @@ class _HostelPgPageState extends State<HostelPgPage> {
     );
   }
 
-  Widget _buildQuickStats(
-    Color cardColor,
-    Color accentColor,
-    Color successColor,
-    Color warningColor,
-    Color borderColor,
-    Color textSecondary,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildStatItem(
-            '42',
-            'Available\nHostels',
-            accentColor,
-            textSecondary,
-          ),
-          Container(width: 1, height: 40, color: borderColor),
-          _buildStatItem('12', 'New This\nWeek', successColor, textSecondary),
-          Container(width: 1, height: 40, color: borderColor),
-          _buildStatItem(
-            '28',
-            'Verified\nListings',
-            warningColor,
-            textSecondary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(
-    String number,
-    String label,
-    Color color,
-    Color textSecondary,
-  ) {
-    return Column(
-      children: [
-        Text(
-          number,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: color,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: textSecondary,
-            fontWeight: FontWeight.w500,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-
   Widget _buildSectionHeader(
     String title,
     Color textPrimary,
@@ -545,25 +462,7 @@ class _HostelPgPageState extends State<HostelPgPage> {
     Color successColor,
     Color warningColor,
   ) {
-    final facilities =
-        (hostel['facilities'] is List)
-            ? hostel['facilities'] as List
-            : (hostel['facilities'] is Map
-                ? (hostel['facilities'] as Map).entries
-                    .where((e) => e.value == true)
-                    .map((e) => e.key)
-                    .toList()
-                : <dynamic>[]);
 
-    final specialFeatures =
-        (hostel['specialFeatures'] is List)
-            ? hostel['specialFeatures'] as List
-            : (hostel['specialFeatures'] is Map
-                ? (hostel['specialFeatures'] as Map).entries
-                    .where((e) => e.value == true)
-                    .map((e) => e.key)
-                    .toList()
-                : <dynamic>[]);
 
     return Container(
       decoration: BoxDecoration(
@@ -640,11 +539,10 @@ class _HostelPgPageState extends State<HostelPgPage> {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          // TODO: Navigate to details page with hostel['key']
                           Navigator.pushNamed(
                             context,
-                            '/propertyDetails',
-                            arguments: {'propertyId': hostel['key']},
+                            '/hostelpg_details',
+                            arguments: {'hostelId': hostel['key']},
                           );
                         },
                         style: ElevatedButton.styleFrom(

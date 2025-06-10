@@ -37,6 +37,7 @@ class _ListRoomFormState extends State<ListRoomForm>
       TextEditingController(); // Not used in this example
   final _rentController = TextEditingController();
   final _depositController = TextEditingController();
+  final _brokerageController = TextEditingController(); // Added controller
   DateTime? _availableFromDate;
   String _roomType = 'Private';
   String _flatSize = '1BHK';
@@ -91,18 +92,16 @@ class _ListRoomFormState extends State<ListRoomForm>
   ];
 
   // Contact Details
+  final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _notesController = TextEditingController();
 
   // Payment Plan
   String _selectedPlan = '1Day';
-  final Map<String, double> _planPrices = {
-    '1Day': 29.0,
-    '7Day': 149.0,
-    '15Day': 239.0,
-    '1Month': 499.0,
-  };
+  Map<String, Map<String, double>> _planPrices = {};
+  bool _isPlanPricesLoading = true;
+  String? _planPricesError;
 
   // Add these theme variables
   late ThemeData theme;
@@ -124,7 +123,7 @@ class _ListRoomFormState extends State<ListRoomForm>
         _triggerSlideAnimation();
       }
     });
-
+    _fetchPlanPrices();
     _progressAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
@@ -177,11 +176,15 @@ class _ListRoomFormState extends State<ListRoomForm>
     _fabAnimationController.dispose();
     _titleController.dispose();
     _locationController.dispose();
+    _locationUrlController.dispose();
     _rentController.dispose();
     _depositController.dispose();
+    _brokerageController.dispose();
+    _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
     _notesController.dispose();
+    _nameController.dispose(); // Dispose the controller
     super.dispose();
   }
 
@@ -247,6 +250,8 @@ class _ListRoomFormState extends State<ListRoomForm>
       'locationUrl': _locationUrlController.text,
       'rent': _rentController.text,
       'deposit': _depositController.text,
+      'brokerage': _brokerageController.text,
+      'name': _nameController.text,
       'availableFromDate': _availableFromDate?.toIso8601String(),
       'roomType': _roomType,
       'flatSize': _flatSize,
@@ -271,7 +276,10 @@ class _ListRoomFormState extends State<ListRoomForm>
       'createdAt': now.toIso8601String(),
       'selectedPlan': _selectedPlan,
       'expiryDate': expiryDate.toIso8601String(),
-      'visibility': true, // Always true on creation
+      'visibility': true, // Always true on creation,
+      'phone': _phoneController.text,
+      'email': _emailController.text,
+      'notes': _notesController.text,
     };
 
     try {
@@ -357,6 +365,59 @@ class _ListRoomFormState extends State<ListRoomForm>
           duration: const Duration(seconds: 3),
         ),
       );
+    }
+  }
+
+  Future<void> _fetchPlanPrices() async {
+    setState(() {
+      _isPlanPricesLoading = true;
+      _planPricesError = null;
+    });
+    try {
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('plan_prices')
+              .doc('list_room')
+              .collection('day_wise_prices')
+              .get();
+      Map<String, Map<String, double>> prices = {};
+      for (var d in doc.docs) {
+        final data = d.data();
+        double? actual =
+            (data['actual_price'] is int)
+                ? (data['actual_price'] as int).toDouble()
+                : (data['actual_price'] as num?)?.toDouble();
+        double? discounted =
+            (data['discounted_price'] is int)
+                ? (data['discounted_price'] as int).toDouble()
+                : (data['discounted_price'] as num?)?.toDouble();
+        prices[d.id] = {'actual': actual ?? 0, 'discounted': discounted ?? 0};
+      }
+      // Map Firestore keys to your plan keys
+      Map<String, String> firestoreToPlanKey = {
+        '1 day': '1Day',
+        '7 days': '7Day',
+        '15 days': '15Day',
+        '1 month': '1Month',
+      };
+      Map<String, Map<String, double>> mappedPrices = {};
+      firestoreToPlanKey.forEach((firestoreKey, planKey) {
+        if (prices.containsKey(firestoreKey)) {
+          mappedPrices[planKey] = prices[firestoreKey]!;
+        }
+      });
+      setState(() {
+        _planPrices = mappedPrices;
+        _isPlanPricesLoading = false;
+        if (_planPrices.isNotEmpty && !_planPrices.containsKey(_selectedPlan)) {
+          _selectedPlan = _planPrices.keys.first;
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _planPricesError = 'Failed to load plan prices';
+        _isPlanPricesLoading = false;
+      });
     }
   }
 
@@ -596,6 +657,16 @@ class _ListRoomFormState extends State<ListRoomForm>
 
             const SizedBox(height: BuddyTheme.spacingLg),
 
+            _buildAnimatedTextField(
+              controller: _brokerageController,
+              label: 'Brokerage Amount (₹) (if any)',
+              hint: 'Enter brokerage fee (if any)',
+              icon: Icons.real_estate_agent,
+              keyboardType: TextInputType.number,
+            ),
+
+            const SizedBox(height: BuddyTheme.spacingLg),
+
             _buildPricingTipCard(),
           ],
         ),
@@ -740,9 +811,18 @@ class _ListRoomFormState extends State<ListRoomForm>
             const SizedBox(height: BuddyTheme.spacingMd),
 
             _buildAnimatedTextField(
+              controller: _nameController,
+              label: 'Your Name',
+              hint: 'Enter your name',
+              icon: Icons.person_outline,
+            ),
+
+            const SizedBox(height: BuddyTheme.spacingLg),
+
+            _buildAnimatedTextField(
               controller: _phoneController,
               label: 'Phone Number',
-              hint: 'Enter your contact number',
+              hint: 'Enter phone number',
               icon: Icons.phone_outlined,
               keyboardType: TextInputType.phone,
             ),
@@ -783,23 +863,40 @@ class _ListRoomFormState extends State<ListRoomForm>
               'Choose how long to keep your listing active',
             ),
             const SizedBox(height: BuddyTheme.spacingXl),
-
-            ..._planPrices.entries
-                .map(
-                  (plan) => Padding(
-                    padding: const EdgeInsets.only(
-                      bottom: BuddyTheme.spacingMd,
+            if (_isPlanPricesLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_planPricesError != null)
+              Center(
+                child: Text(
+                  _planPricesError!,
+                  style: TextStyle(color: Colors.red),
+                ),
+              )
+            else if (_planPrices.isEmpty)
+              Center(
+                child: Text(
+                  'No plans available',
+                  style: TextStyle(color: Colors.red),
+                ),
+              )
+            else
+              ..._planPrices.entries
+                  .map(
+                    (plan) => Padding(
+                      padding: const EdgeInsets.only(
+                        bottom: BuddyTheme.spacingMd,
+                      ),
+                      child: _buildPlanCard(
+                        plan.key,
+                        plan.value['actual'] ?? 0,
+                        discountedPrice: plan.value['discounted'] ?? 0,
+                        isSelected: _selectedPlan == plan.key,
+                        onSelect:
+                            () => setState(() => _selectedPlan = plan.key),
+                      ),
                     ),
-                    child: _buildPlanCard(
-                      plan.key,
-                      plan.value,
-                      isSelected: _selectedPlan == plan.key,
-                      onSelect: () => setState(() => _selectedPlan = plan.key),
-                    ),
-                  ),
-                )
-                .toList(),
-
+                  )
+                  .toList(),
             const SizedBox(height: BuddyTheme.spacingXl),
             _buildPlanInfoCard(),
           ],
@@ -810,13 +907,16 @@ class _ListRoomFormState extends State<ListRoomForm>
 
   Widget _buildPlanCard(
     String planName,
-    double price, {
+    double actualPrice, {
+    double discountedPrice = 0,
     required bool isSelected,
     required VoidCallback onSelect,
   }) {
     String duration = planName;
-    String formattedPrice = '₹${price.toStringAsFixed(0)}';
-
+    bool hasDiscount = discountedPrice > 0 && discountedPrice < actualPrice;
+    String formattedActual = '₹${actualPrice.toStringAsFixed(0)}';
+    String formattedDiscounted =
+        hasDiscount ? '₹${discountedPrice.toStringAsFixed(0)}' : '';
     return TweenAnimationBuilder(
       duration: const Duration(milliseconds: 600),
       tween: Tween<double>(begin: 0.0, end: 1.0),
@@ -890,17 +990,41 @@ class _ListRoomFormState extends State<ListRoomForm>
                             ],
                           ),
                         ),
-                        Text(
-                          formattedPrice,
-                          style: TextStyle(
-                            color:
-                                isSelected
-                                    ? BuddyTheme.primaryColor
-                                    : textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
+                        if (hasDiscount) ...[
+                          Text(
+                            formattedDiscounted,
+                            style: TextStyle(
+                              color:
+                                  isSelected
+                                      ? BuddyTheme.primaryColor
+                                      : Colors.green,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Text(
+                            formattedActual,
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                        ] else ...[
+                          Text(
+                            formattedActual,
+                            style: TextStyle(
+                              color:
+                                  isSelected
+                                      ? BuddyTheme.primaryColor
+                                      : textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1656,7 +1780,7 @@ class _ListRoomFormState extends State<ListRoomForm>
                         Text(
                           '• Research similar properties in your area\n'
                           '• Consider including utilities in rent\n'
-                          '• Security deposit is typically 1-3 months rent\n'
+                          '• Security deposit is typically 1-2 months rent\n'
                           '• Be transparent about additional charges',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: BuddyTheme.textSecondaryColor),
