@@ -639,8 +639,8 @@ class _ListRoomFormState extends State<ListRoomForm>
 
             _buildAnimatedTextField(
               controller: _rentController,
-              label: 'Monthly Rent (₹)',
-              hint: 'Enter amount per person or total',
+              label: 'Monthly Rent per person (₹)',
+              hint: 'Enter amount per person',
               icon: Icons.currency_rupee,
               keyboardType: TextInputType.number,
             ),
@@ -659,7 +659,7 @@ class _ListRoomFormState extends State<ListRoomForm>
 
             _buildAnimatedTextField(
               controller: _brokerageController,
-              label: 'Brokerage Amount (₹) (if any)',
+              label: 'Brokerage Amount per person (₹) (if any)',
               hint: 'Enter brokerage fee (if any)',
               icon: Icons.real_estate_agent,
               keyboardType: TextInputType.number,

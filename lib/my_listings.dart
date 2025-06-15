@@ -1,10 +1,13 @@
+import 'package:buddy/widgets/list_hostel_form.dart';
+import 'package:buddy/widgets/list_room_form.dart';
+import 'package:buddy/widgets/list_service_form.dart';
+import 'package:buddy/widgets/room_request_form.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'display pages/property_details.dart';
-import 'display pages/hostelpg_details.dart';
-import 'display pages/service_details.dart';
+import 'package:share_plus/share_plus.dart';
 import 'display pages/flatmate_details.dart';
+import 'edit_flatmate.dart';
 
 class MyListingsPage extends StatefulWidget {
   const MyListingsPage({Key? key}) : super(key: key);
@@ -62,7 +65,6 @@ class _MyListingsPageState extends State<MyListingsPage>
 
     try {
       final uid = user.uid;
-      final now = DateTime.now();
       // Room listings
       final roomSnap =
           await FirebaseFirestore.instance
@@ -70,7 +72,7 @@ class _MyListingsPageState extends State<MyListingsPage>
               .where('userId', isEqualTo: uid)
               .get();
       // Hostel listings
-          final hostelSnap =
+      final hostelSnap =
           await FirebaseFirestore.instance
               .collection('hostel_listings')
               .where('uid', isEqualTo: uid)
@@ -106,11 +108,31 @@ class _MyListingsPageState extends State<MyListingsPage>
                   orElse: () => '',
                 )
                 : (data['imageUrl'] ?? '');
+        // --- Visibility check ---
+        if (data['expiryDate'] != null &&
+            data['expiryDate'].toString().isNotEmpty) {
+          final expiry = DateTime.tryParse(data['expiryDate'].toString());
+          if (expiry != null && expiry.isBefore(DateTime.now())) {
+            data['visibility'] = false;
+          }
+        }
         all.add(data);
       }
       // Hostel
       for (var doc in hostelSnap.docs) {
-        final data = doc.data();
+        final raw = doc.data();
+        final Map<String, dynamic> data = {};
+        raw.forEach((key, value) {
+          if (value is Timestamp) {
+            data[key] = value.toDate().toIso8601String();
+          } else if (value is Map) {
+            data[key] = Map<String, dynamic>.from(value);
+          } else if (value is List) {
+            data[key] = List.from(value);
+          } else {
+            data[key] = value;
+          }
+        });
         data['key'] = doc.id;
         data['listingType'] = 'Hostel/PG';
         data['title'] =
@@ -124,6 +146,14 @@ class _MyListingsPageState extends State<MyListingsPage>
                   orElse: () => '',
                 )
                 : (data['imageUrl'] ?? '');
+        // --- Visibility check ---
+        if (data['expiryDate'] != null &&
+            data['expiryDate'].toString().isNotEmpty) {
+          final expiry = DateTime.tryParse(data['expiryDate'].toString());
+          if (expiry != null && expiry.isBefore(DateTime.now())) {
+            data['visibility'] = false;
+          }
+        }
         all.add(data);
       }
       // Service
@@ -139,6 +169,14 @@ class _MyListingsPageState extends State<MyListingsPage>
                     (data['additionalPhotos'] as List).isNotEmpty
                 ? data['additionalPhotos'][0]
                 : (data['imageUrl'] ?? ''));
+        // --- Visibility check ---
+        if (data['expiryDate'] != null &&
+            data['expiryDate'].toString().isNotEmpty) {
+          final expiry = DateTime.tryParse(data['expiryDate'].toString());
+          if (expiry != null && expiry.isBefore(DateTime.now())) {
+            data['visibility'] = false;
+          }
+        }
         all.add(data);
       }
       // Flatmate
@@ -148,7 +186,15 @@ class _MyListingsPageState extends State<MyListingsPage>
         data['listingType'] = 'Flatmate';
         data['title'] = data['title'] ?? data['name'] ?? 'Flatmate Listing';
         data['location'] = data['location'] ?? '';
-        data['imageUrl'] = data['photoUrl'] ?? (data['image'] ?? '');
+        data['imageUrl'] = data['profilePhotoUrl'] ?? '';
+        // --- Visibility check ---
+        if (data['expiryDate'] != null &&
+            data['expiryDate'].toString().isNotEmpty) {
+          final expiry = DateTime.tryParse(data['expiryDate'].toString());
+          if (expiry != null && expiry.isBefore(DateTime.now())) {
+            data['visibility'] = false;
+          }
+        }
         all.add(data);
       }
 
@@ -186,15 +232,15 @@ class _MyListingsPageState extends State<MyListingsPage>
   Color _getListingTypeColor(String type) {
     switch (type) {
       case 'Room':
-        return const Color(0xFF3B82F6);
+        return const Color(0xFF4285F4);
       case 'Hostel/PG':
-        return const Color(0xFF10B981);
+        return const Color(0xFF34A853);
       case 'Service':
-        return const Color(0xFF8B5CF6);
+        return const Color(0xFF9C27B0);
       case 'Flatmate':
-        return const Color(0xFFF59E0B);
+        return const Color(0xFFFF9800);
       default:
-        return const Color(0xFF6B7280);
+        return const Color(0xFF4285F4);
     }
   }
 
@@ -215,296 +261,248 @@ class _MyListingsPageState extends State<MyListingsPage>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final backgroundColor = theme.scaffoldBackgroundColor;
-    final cardColor =
-        isDark ? Colors.grey[850]! : Colors.white.withOpacity(0.95);
-    final textPrimary =
-        theme.textTheme.bodyLarge?.color ??
-        (isDark ? Colors.white : Colors.black);
-    final textSecondary = isDark ? Colors.white70 : Colors.grey[700]!;
-    final iconColor = isDark ? Colors.white : const Color(0xFF1E293B);
-
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: const Color(0xFF1A1A1A),
       body: FadeTransition(
         opacity: _fadeAnimation,
-        child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              expandedHeight: 120.0,
-              floating: false,
-              pinned: true,
-              elevation: 0,
-              backgroundColor: cardColor,
-              leading: Container(
-                margin: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[900] : Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    Icons.arrow_back_ios_new,
-                    color: iconColor,
-                    size: 20,
-                  ),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ),
-              flexibleSpace: FlexibleSpaceBar(
-                title: Text(
-                  'My Listings',
-                  style: TextStyle(
-                    color: textPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 24,
-                  ),
-                ),
-                background: Container(
-                  decoration: BoxDecoration(
-                    color: backgroundColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
+              child: Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 20,
                       ),
-                    ],
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 16),
+                  const Text(
+                    'My Listings',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${_filteredListings.length} items',
+                    style: const TextStyle(
+                      color: Color(0xFF4285F4),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
+            // Filter section
             if (!_isLoading && _listings.isNotEmpty)
-              SliverToBoxAdapter(
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${_filteredListings.length} Properties',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: textPrimary,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              'Active',
-                              style: TextStyle(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        height: 50,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _filterOptions.length,
-                          itemBuilder: (context, index) {
-                            final option = _filterOptions[index];
-                            final isSelected = _selectedFilter == option;
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _selectedFilter = option;
-                                });
-                              },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                margin: const EdgeInsets.only(right: 12),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 20,
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color:
-                                      isSelected
-                                          ? theme.colorScheme.primary
-                                          : cardColor,
-                                  borderRadius: BorderRadius.circular(25),
-                                  border: Border.all(
-                                    color:
-                                        isSelected
-                                            ? theme.colorScheme.primary
-                                            : (isDark
-                                                ? Colors.grey[800]!
-                                                : Colors.grey[300]!),
-                                  ),
-                                  boxShadow:
-                                      isSelected
-                                          ? [
-                                            BoxShadow(
-                                              color: theme.colorScheme.primary
-                                                  .withOpacity(0.3),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ]
-                                          : null,
-                                ),
-                                child: Text(
-                                  option,
-                                  style: TextStyle(
-                                    color:
-                                        isSelected
-                                            ? Colors.white
-                                            : textSecondary,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.filter_list_rounded,
+                          color: Color(0xFF4285F4),
+                          size: 20,
                         ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Filter Categories',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Single row filter options
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children:
+                            _filterOptions.map((option) {
+                              final isSelected = _selectedFilter == option;
+                              return Container(
+                                margin: const EdgeInsets.only(right: 12),
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedFilter = option;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          isSelected
+                                              ? const Color(0xFF4285F4)
+                                              : const Color(0xFF2A2A2A),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color:
+                                            isSelected
+                                                ? const Color(0xFF4285F4)
+                                                : Colors.grey[700]!,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      option,
+                                      style: TextStyle(
+                                        color:
+                                            isSelected
+                                                ? Colors.white
+                                                : Colors.grey[300],
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            if (_isLoading)
-              const SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Color(0xFF3B82F6),
+            const SizedBox(height: 20),
+            // Content section
+            Expanded(
+              child:
+                  _isLoading
+                      ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF4285F4),
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Loading your listings...',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Loading your listings...',
-                        style: TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontSize: 16,
+                      )
+                      : _filteredListings.isEmpty
+                      ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2A2A2A),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Icon(
+                                Icons.home_outlined,
+                                size: 64,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            const Text(
+                              'No listings found',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _selectedFilter == 'All'
+                                  ? 'Start creating your first listing'
+                                  : 'No ${_selectedFilter.toLowerCase()} listings found',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else if (_filteredListings.isEmpty)
-              SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.grey[900] : Colors.grey[100],
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Icon(
-                          Icons.home_outlined,
-                          size: 64,
-                          color: isDark ? Colors.grey[700] : Colors.grey[400],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'No listings found',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _selectedFilter == 'All'
-                            ? 'Start creating your first listing'
-                            : 'No ${_selectedFilter.toLowerCase()} listings found',
-                        style: TextStyle(fontSize: 16, color: textSecondary),
-                      ),
-                      const SizedBox(height: 32),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          // Navigate to create listing page
+                      )
+                      : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        itemCount: _filteredListings.length,
+                        itemBuilder: (context, index) {
+                          final listing = _filteredListings[index];
+                          return _buildListingCard(listing, index);
                         },
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Create Listing'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      ),
+            ),
+            // Bottom button
+            if (!_isLoading)
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      _showAddListingActionSheet();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4285F4),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Add New Listing',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ),
-                    ],
+                        SizedBox(width: 8),
+                        Icon(Icons.arrow_forward_rounded, size: 20),
+                      ],
+                    ),
                   ),
-                ),
-              )
-            else if (_filteredListings.isNotEmpty)
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final listing = _filteredListings[index];
-                    return _buildListingCard(
-                      listing,
-                      index,
-                      cardColor,
-                      textPrimary,
-                      textSecondary,
-                      isDark,
-                    );
-                  }, childCount: _filteredListings.length),
                 ),
               ),
           ],
         ),
       ),
-      floatingActionButton:
-          _isLoading
-              ? null
-              : FloatingActionButton.extended(
-                onPressed: () {
-                  // Navigate to create listing page
-                },
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: Colors.white,
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Add Listing'),
-              ),
     );
   }
 
-  Widget _buildListingCard(
-    Map<String, dynamic> listing,
-    int index,
-    Color cardColor,
-    Color textPrimary,
-    Color textSecondary,
-    bool isDark,
-  ) {
+  Widget _buildListingCard(Map<String, dynamic> listing, int index) {
     final image = listing['imageUrl'] ?? '';
     final listingType = listing['listingType'] ?? '';
     final color = _getListingTypeColor(listingType);
@@ -521,118 +519,139 @@ class _MyListingsPageState extends State<MyListingsPage>
             child: Container(
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                color: const Color(0xFF2A2A2A),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[800]!, width: 1),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: InkWell(
-                  onTap: () {
-                    // Navigate to property details
-                  },
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Image Section
-                      Container(
-                        height: 200,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [color.withOpacity(0.8), color],
-                          ),
+              child: InkWell(
+                onTap: () {
+                  // Navigate to property details
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Image Section
+                    Container(
+                      height: 180,
+                      width: double.infinity,
+                      decoration: const BoxDecoration(
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
                         ),
                         child: Stack(
                           children: [
-                            if (image.isNotEmpty)
+                            if (listingType == 'Flatmate')
+                              Center(
+                                child: Container(
+                                  width: 140,
+                                  height: 140,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: color, width: 3),
+                                  ),
+                                  child: ClipOval(
+                                    child:
+                                        image.isNotEmpty
+                                            ? Image.network(
+                                              image,
+                                              width: 140,
+                                              height: 140,
+                                              fit: BoxFit.cover,
+                                              errorBuilder:
+                                                  (
+                                                    context,
+                                                    error,
+                                                    stackTrace,
+                                                  ) => Container(
+                                                    color: color.withOpacity(
+                                                      0.2,
+                                                    ),
+                                                    child: Icon(
+                                                      icon,
+                                                      size: 48,
+                                                      color: color,
+                                                    ),
+                                                  ),
+                                            )
+                                            : Container(
+                                              color: color.withOpacity(0.2),
+                                              child: Icon(
+                                                icon,
+                                                size: 48,
+                                                color: color,
+                                              ),
+                                            ),
+                                  ),
+                                ),
+                              )
+                            else if (image.isNotEmpty)
                               Image.network(
                                 image,
                                 width: double.infinity,
                                 height: double.infinity,
                                 fit: BoxFit.cover,
                                 errorBuilder:
-                                    (context, error, stackTrace) => Center(
-                                      child: Icon(
-                                        icon,
-                                        size: 64,
-                                        color: Colors.white.withOpacity(0.8),
+                                    (context, error, stackTrace) => Container(
+                                      color: color.withOpacity(0.2),
+                                      child: Center(
+                                        child: Icon(
+                                          icon,
+                                          size: 48,
+                                          color: color,
+                                        ),
                                       ),
                                     ),
                               )
                             else
-                              Center(
-                                child: Icon(
-                                  icon,
-                                  size: 64,
-                                  color: Colors.white.withOpacity(0.8),
+                              Container(
+                                color: color.withOpacity(0.2),
+                                child: Center(
+                                  child: Icon(icon, size: 48, color: color),
                                 ),
                               ),
-                            // Gradient overlay
-                            Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    Colors.black.withOpacity(0.3),
-                                  ],
-                                ),
-                              ),
-                            ),
                             // Type badge
                             Positioned(
-                              top: 16,
-                              left: 16,
+                              top: 12,
+                              left: 12,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
+                                  horizontal: 8,
+                                  vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.9),
-                                  borderRadius: BorderRadius.circular(20),
+                                  color: color,
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(icon, size: 16, color: color),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      listingType,
-                                      style: TextStyle(
-                                        color: color,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
+                                child: Text(
+                                  listingType,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
                             ),
                             // More options
                             Positioned(
-                              top: 16,
-                              right: 16,
+                              top: 12,
+                              right: 12,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.9),
-                                  borderRadius: BorderRadius.circular(20),
+                                  color: Colors.black.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: IconButton(
                                   icon: const Icon(
                                     Icons.more_vert_rounded,
-                                    size: 20,
-                                    color: Color(0xFF1E293B),
+                                    size: 18,
+                                    color: Colors.white,
                                   ),
                                   onPressed: () {
                                     _showOptionsBottomSheet(listing);
@@ -643,101 +662,83 @@ class _MyListingsPageState extends State<MyListingsPage>
                           ],
                         ),
                       ),
-                      // Content Section
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              listing['title'] ?? 'No Title',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: textPrimary,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                    ),
+                    // Content Section
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            listing['title'] ?? 'No Title',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (listing['location']?.isNotEmpty == true) ...[
                             const SizedBox(height: 8),
-                            if (listing['location']?.isNotEmpty == true)
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.location_on_rounded,
-                                    size: 16,
-                                    color:
-                                        isDark
-                                            ? Colors.grey[400]
-                                            : Colors.grey[600],
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      listing['location'],
-                                      style: TextStyle(
-                                        color:
-                                            isDark
-                                                ? Colors.grey[400]
-                                                : Colors.grey[600],
-                                        fontSize: 14,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            const SizedBox(height: 12),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                if (listing['rent'] != null)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
+                                const Icon(
+                                  Icons.location_on_rounded,
+                                  size: 14,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    listing['location'],
+                                    style: const TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 13,
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: color.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      '₹${listing['rent']}/month',
-                                      style: TextStyle(
-                                        color: color,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  const SizedBox(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Text(
-                                    'Active',
-                                    style: TextStyle(
-                                      color: Colors.green,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12,
-                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
                             ),
                           ],
-                        ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color:
+                                      (listing['visibility'] == false)
+                                          ? Colors.red.withOpacity(0.2)
+                                          : Colors.green.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  (listing['visibility'] == false)
+                                      ? 'Inactive'
+                                      : 'Active',
+                                  style: TextStyle(
+                                    color:
+                                        (listing['visibility'] == false)
+                                            ? Colors.red
+                                            : Colors.green,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -752,19 +753,13 @@ class _MyListingsPageState extends State<MyListingsPage>
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        final theme = Theme.of(context);
-        final isDark = theme.brightness == Brightness.dark;
-        final cardColor = theme.cardColor;
-        final dividerColor = isDark ? Colors.grey[800] : Colors.grey[300];
-        final iconColor = isDark ? Colors.white : const Color(0xFF1E293B);
-
         final bool canEdit =
             listing['visibility'] == false || listing['visibility'] == null;
 
         return Container(
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: const BoxDecoration(
+            color: Color(0xFF2A2A2A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -774,7 +769,7 @@ class _MyListingsPageState extends State<MyListingsPage>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: dividerColor,
+                  color: Colors.grey[700],
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -782,8 +777,8 @@ class _MyListingsPageState extends State<MyListingsPage>
               _buildOptionTile(
                 icon: Icons.visibility_rounded,
                 title: 'View Details',
-                iconColor: iconColor,
-                textColor: iconColor,
+                iconColor: Colors.white,
+                textColor: Colors.white,
                 onTap: () {
                   Navigator.pop(context);
                   final type = listing['listingType'];
@@ -821,8 +816,8 @@ class _MyListingsPageState extends State<MyListingsPage>
                 _buildOptionTile(
                   icon: Icons.edit_rounded,
                   title: 'Edit Details',
-                  iconColor: theme.colorScheme.secondary,
-                  textColor: theme.colorScheme.secondary,
+                  iconColor: const Color(0xFF4285F4),
+                  textColor: const Color(0xFF4285F4),
                   onTap: () {
                     _navigateToEditPage(listing);
                   },
@@ -830,11 +825,11 @@ class _MyListingsPageState extends State<MyListingsPage>
               _buildOptionTile(
                 icon: Icons.share_rounded,
                 title: 'Share',
-                iconColor: iconColor,
-                textColor: iconColor,
+                iconColor: Colors.white,
+                textColor: Colors.white,
                 onTap: () {
                   Navigator.pop(context);
-                  // Share functionality
+                  _shareListing(listing);
                 },
               ),
               _buildOptionTile(
@@ -860,7 +855,7 @@ class _MyListingsPageState extends State<MyListingsPage>
     final id = listing['key'];
 
     Navigator.pop(context); // Close bottom sheet
-    
+
     switch (type) {
       case 'Room':
         await Navigator.pushNamed(
@@ -869,19 +864,33 @@ class _MyListingsPageState extends State<MyListingsPage>
           arguments: {
             'propertyId': id,
             'propertyData': listing,
-            'isEditing': true
+            'isEditing': true,
           },
         );
         break;
       case 'Hostel/PG':
+        print('Debug - Navigation Hostel Data: ${listing.toString()}');
+        // Create a clean copy of the data
+        final Map<String, dynamic> cleanData = {};
+        listing.forEach((key, value) {
+          // Skip null values and ensure all values are of basic types
+          if (value != null) {
+            if (value is Map) {
+              cleanData[key] = Map<String, dynamic>.from(value);
+            } else if (value is List) {
+              cleanData[key] = List.from(value);
+            } else if (value is DateTime) {
+              cleanData[key] = value.toIso8601String();
+            } else if (value is String || value is num || value is bool) {
+              cleanData[key] = value;
+            }
+          }
+        });
+        print('Debug - Clean Hostel Data: ${cleanData.toString()}');
         await Navigator.pushNamed(
           context,
           '/editHostelPG',
-          arguments: {
-            'hostelId': id,
-            'hostelData': listing,
-            'isEditing': true
-          },
+          arguments: {'id': id, 'hostelData': cleanData},
         );
         break;
       case 'Service':
@@ -891,19 +900,18 @@ class _MyListingsPageState extends State<MyListingsPage>
           arguments: {
             'serviceId': id,
             'serviceData': listing,
-            'isEditing': true
+            'isEditing': true,
           },
         );
         break;
       case 'Flatmate':
-        await Navigator.pushNamed(
+        await Navigator.push(
           context,
-          '/editFlatmate',
-          arguments: {
-            'flatmateId': id,
-            'flatmateData': listing,
-            'isEditing': true
-          },
+          MaterialPageRoute(
+            builder:
+                (context) =>
+                    EditFlatmatePage(flatmateId: id, flatmateData: listing),
+          ),
         );
         break;
       default:
@@ -915,7 +923,7 @@ class _MyListingsPageState extends State<MyListingsPage>
         );
         return;
     }
-    
+
     // Refresh listings after returning from edit page
     await _fetchMyListings();
   }
@@ -928,11 +936,11 @@ class _MyListingsPageState extends State<MyListingsPage>
     Color? textColor,
   }) {
     return ListTile(
-      leading: Icon(icon, color: iconColor ?? const Color(0xFF1E293B)),
+      leading: Icon(icon, color: iconColor ?? Colors.white),
       title: Text(
         title,
         style: TextStyle(
-          color: textColor ?? const Color(0xFF1E293B),
+          color: textColor ?? Colors.white,
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -945,36 +953,23 @@ class _MyListingsPageState extends State<MyListingsPage>
     showDialog(
       context: context,
       builder: (context) {
-        final theme = Theme.of(context);
-        final isDark = theme.brightness == Brightness.dark;
-        
         return AlertDialog(
-          backgroundColor: isDark ? Colors.grey[850] : Colors.white,
+          backgroundColor: const Color(0xFF2A2A2A),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: Text(
+          title: const Text(
             'Delete Listing',
-            style: TextStyle(
-              color: isDark ? Colors.white : Colors.black,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
-          content: Text(
+          content: const Text(
             'Are you sure you want to delete this listing? This action cannot be undone.',
-            style: TextStyle(
-              color: isDark ? Colors.white70 : Colors.grey[800],
-            ),
+            style: TextStyle(color: Colors.grey),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
-                ),
-              ),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
             ),
             TextButton(
               onPressed: () {
@@ -999,7 +994,7 @@ class _MyListingsPageState extends State<MyListingsPage>
     try {
       final type = listing['listingType'];
       final id = listing['key'];
-      
+
       switch (type) {
         case 'Room':
           await FirebaseFirestore.instance
@@ -1060,5 +1055,124 @@ class _MyListingsPageState extends State<MyListingsPage>
         );
       }
     }
+  }
+
+  void _showAddListingActionSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF2A2A2A),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[700],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildOptionTile(
+                icon: Icons.bed_rounded,
+                title: 'Add Room Listing',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ListRoomForm(),
+                    ),
+                  );
+                },
+                iconColor: const Color(0xFF4285F4),
+                textColor: const Color(0xFF4285F4),
+              ),
+              _buildOptionTile(
+                icon: Icons.apartment_rounded,
+                title: 'Add Hostel/PG Listing',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => ListHostelForm()),
+                  );
+                },
+                iconColor: const Color(0xFF34A853),
+                textColor: const Color(0xFF34A853),
+              ),
+              _buildOptionTile(
+                icon: Icons.build_rounded,
+                title: 'Add Service Listing',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ListServiceForm(),
+                    ),
+                  );
+                },
+                iconColor: const Color(0xFF9C27B0),
+                textColor: const Color(0xFF9C27B0),
+              ),
+              _buildOptionTile(
+                icon: Icons.people_rounded,
+                title: 'Add Flatmate Listing',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RoomRequestForm(),
+                    ),
+                  );
+                },
+                iconColor: const Color(0xFFFF9800),
+                textColor: const Color(0xFFFF9800),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _shareListing(Map<String, dynamic> listing) {
+    final type = listing['listingType'] ?? '';
+    String shareText = '';
+    switch (type) {
+      case 'Room':
+        shareText =
+            'Room for rent: \\${listing['title'] ?? ''}\\nLocation: \\${listing['location'] ?? ''}\\n';
+        break;
+      case 'Hostel/PG':
+        shareText =
+            'Hostel/PG: \\${listing['title'] ?? ''}\\nLocation: \\${listing['location'] ?? ''}\\n';
+        break;
+      case 'Service':
+        shareText =
+            'Service: \\${listing['title'] ?? ''}\\nLocation: \\${listing['location'] ?? ''}\\n';
+        break;
+      case 'Flatmate':
+        shareText =
+            'Flatmate needed: \\${listing['title'] ?? ''}\\nLocation: \\${listing['location'] ?? ''}\\n';
+        break;
+      default:
+        shareText =
+            '\\${listing['title'] ?? ''}\\nLocation: \\${listing['location'] ?? ''}\\n';
+    }
+    if ((listing['description'] ?? '').toString().isNotEmpty) {
+      shareText += '\\n${listing['description']}';
+    }
+    Share.share(shareText, subject: listing['title'] ?? 'Listing');
   }
 }

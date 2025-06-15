@@ -314,7 +314,7 @@ class _RoomRequestFormState extends State<RoomRequestForm>
       'location': _locationController.text,
       'minBudget': int.tryParse(_minBudgetController.text) ?? 0,
       'maxBudget': int.tryParse(_maxBudgetController.text) ?? 0,
-      'moveInDate': _moveInDate,
+      'moveInDate': _moveInDate != null ? _moveInDate!.toIso8601String() : null,
       'preferredRoomType': _preferredRoomType,
       'preferredFlatmates': _preferredFlatmates,
       'preferredFlatmateGender': _preferredFlatmateGender,
@@ -327,8 +327,8 @@ class _RoomRequestFormState extends State<RoomRequestForm>
       'email': _emailController.text,
       'bio': _bioController.text,
       'selectedPlan': _selectedPlan,
-      'createdAt': FieldValue.serverTimestamp(),
-      'expiryDate': Timestamp.fromDate(expiryDate),
+      'createdAt': now.toIso8601String(),
+      'expiryDate': expiryDate.toIso8601String(),
       'visibility': true,
     };
 

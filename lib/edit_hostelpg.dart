@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'models/hostel_data.dart';
 
-class EditPropertyPage extends StatefulWidget {
-  final Map<String, dynamic> propertyData;
-  const EditPropertyPage({Key? key, required this.propertyData})
+class EditHostelPGPage extends StatefulWidget {
+  final Map<String, dynamic> hostelData;
+  const EditHostelPGPage({Key? key, required this.hostelData})
     : super(key: key);
 
   @override
-  State<EditPropertyPage> createState() => _EditPropertyPageState();
+  State<EditHostelPGPage> createState() => _EditHostelPGPageState();
 }
 
-class _EditPropertyPageState extends State<EditPropertyPage> {
+class _EditHostelPGPageState extends State<EditHostelPGPage> {
   final _formKey = GlobalKey<FormState>();
+  late HostelData _hostelData;
 
   // Payment Plan
   String? selectedPlan;
@@ -20,63 +22,48 @@ class _EditPropertyPageState extends State<EditPropertyPage> {
   bool _isPlanPricesLoading = true;
   String? _planPricesError;
 
+  // Room Types
+  Map<String, bool> _availableRoomTypes = {
+    '1 Bed Room (Private)': false,
+    '2 Bed Room': false,
+    '3 Bed Room': false,
+    '4+ Bed Room': false,
+  };
+
+  // Form controllers
   late TextEditingController _titleController;
-  late TextEditingController _locationController;
-  late TextEditingController _rentController;
-  late TextEditingController _securityDepositController;
-  late TextEditingController _brokerageController;
-  late TextEditingController _currentFlatmatesController;
-  late TextEditingController _maxFlatmatesController;
-  late TextEditingController _descriptionController;
-  DateTime? _availableFrom;
+  late TextEditingController _startingPriceController;
+  DateTime? _availableFromDate; // Keep this as null initially
 
   @override
   void initState() {
     super.initState();
+    // Convert the raw map to HostelData model
+    _hostelData = HostelData.fromFirestore(widget.hostelData);
     _fetchPlanPrices();
-    _titleController = TextEditingController(
-      text: widget.propertyData['title'] ?? '',
-    );
-    _locationController = TextEditingController(
-      text: widget.propertyData['location'] ?? '',
-    );
-    _rentController = TextEditingController(
-      text: widget.propertyData['rent']?.toString() ?? '',
-    );
-    _securityDepositController = TextEditingController(
-      text: widget.propertyData['deposit']?.toString() ?? '',
-    );
-    _brokerageController = TextEditingController(
-      text: widget.propertyData['brokerage']?.toString() ?? '',
-    );
-    _currentFlatmatesController = TextEditingController(
-      text: widget.propertyData['currentFlatmates']?.toString() ?? '',
-    );
-    _maxFlatmatesController = TextEditingController(
-      text: widget.propertyData['maxFlatmates']?.toString() ?? '',
-    );
-    _descriptionController = TextEditingController(
-      text: widget.propertyData['description'] ?? '',
-    );
-    _availableFrom =
-        widget.propertyData['availableFromDate'] != null &&
-                widget.propertyData['availableFromDate'].toString().isNotEmpty
-            ? DateTime.tryParse(widget.propertyData['availableFromDate'])
-            : null;
 
-    _fetchPlanPrices();
+    _titleController = TextEditingController(text: _hostelData.title);
+    _startingPriceController = TextEditingController(
+      text: _hostelData.startingAt.toString(),
+    );
+
+    // Keep _availableFrom as null to show blank field
+    _availableFromDate = null;
+
+    selectedPlan = _hostelData.selectedPlan;
+
+    // Initialize room types from existing data
+    _hostelData.roomTypes.forEach((roomType, isSelected) {
+      if (_availableRoomTypes.containsKey(roomType)) {
+        _availableRoomTypes[roomType] = isSelected;
+      }
+    });
   }
 
   @override
   void dispose() {
     _titleController.dispose();
-    _locationController.dispose();
-    _rentController.dispose();
-    _securityDepositController.dispose();
-    _brokerageController.dispose();
-    _currentFlatmatesController.dispose();
-    _maxFlatmatesController.dispose();
-    _descriptionController.dispose();
+    _startingPriceController.dispose();
     super.dispose();
   }
 
@@ -89,7 +76,7 @@ class _EditPropertyPageState extends State<EditPropertyPage> {
       final doc =
           await FirebaseFirestore.instance
               .collection('plan_prices')
-              .doc('list_room')
+              .doc('list_hostelpg')
               .collection('day_wise_prices')
               .get();
       Map<String, Map<String, double>> prices = {};
@@ -133,10 +120,11 @@ class _EditPropertyPageState extends State<EditPropertyPage> {
     }
   }
 
+  // Exactly copied from EditPropertyPage
   void _pickAvailableFrom() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _availableFrom ?? DateTime.now(),
+      initialDate: _availableFromDate ?? DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
       builder: (context, child) {
@@ -152,13 +140,27 @@ class _EditPropertyPageState extends State<EditPropertyPage> {
     );
     if (picked != null) {
       setState(() {
-        _availableFrom = picked;
+        _availableFromDate = picked;
       });
     }
   }
 
   void _saveChanges() async {
     if (_formKey.currentState!.validate()) {
+      // Validate that at least one room type is selected
+      if (!_availableRoomTypes.values.any((isSelected) => isSelected)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Please select at least one room type'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+        return;
+      }
       if (selectedPlan == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -172,10 +174,7 @@ class _EditPropertyPageState extends State<EditPropertyPage> {
         );
         return;
       }
-
-      // Set createdAt to now
-      final now = DateTime.now();
-      // Calculate expiryDate based on plan
+      // Calculate expiry date
       int days = 0;
       switch (selectedPlan) {
         case '1Day':
@@ -191,51 +190,63 @@ class _EditPropertyPageState extends State<EditPropertyPage> {
           days = 30;
           break;
         default:
-          days = 0;
+          days = 1;
       }
+      final now = DateTime.now();
       final expiryDate = now.add(Duration(days: days));
       final visibility = expiryDate.isAfter(now);
-
-      // Update Firestore document directly
-      final docId =
-          widget.propertyData['key'] ??
-          widget.propertyData['id'] ??
-          widget.propertyData['propertyId'];
+      final docId = widget.hostelData['key'] ?? widget.hostelData['id'];
       if (docId != null) {
         await FirebaseFirestore.instance
-            .collection('room_listings')
+            .collection('hostel_listings')
             .doc(docId)
             .update({
+              'title': _titleController.text,
+              'hostelType': _hostelData.hostelType,
+              'hostelFor': _hostelData.hostelFor,
+              'startingAt':
+                  _startingPriceController.text.isNotEmpty
+                      ? int.parse(_startingPriceController.text)
+                      : 0,
+              'contactPerson': _hostelData.contactPerson,
+              'phone': _hostelData.phone,
+              'email': _hostelData.email,
+              'address': _hostelData.address,
+              'landmark': _hostelData.landmark,
+              'mapLink': _hostelData.mapLink,
+              'roomTypes': _availableRoomTypes,
+              'facilities': _hostelData.facilities,
+              'hasEntryTimings': _hostelData.hasEntryTimings,
+              'entryTime': _hostelData.entryTime,
+              'smokingPolicy': _hostelData.smokingPolicy,
+              'drinkingPolicy': _hostelData.drinkingPolicy,
+              'guestsPolicy': _hostelData.guestsPolicy,
+              'petsPolicy': _hostelData.petsPolicy,
+              'foodType': _hostelData.foodType,
+              'availableFromDate': _availableFromDate?.toIso8601String(),
+              'minimumStay': _hostelData.minimumStay,
+              'bookingMode': _hostelData.bookingMode,
+              'uploadedPhotos': _hostelData.uploadedPhotos,
+              'description': _hostelData.description,
+              'offers': _hostelData.offers,
+              'specialFeatures': _hostelData.specialFeatures,
               'createdAt': now.toIso8601String(),
+              'selectedPlan': selectedPlan,
               'expiryDate': expiryDate.toIso8601String(),
               'visibility': visibility,
-              'title': _titleController.text,
-              'location': _locationController.text,
-              'rent': double.tryParse(_rentController.text) ?? 0,
-              'deposit': double.tryParse(_securityDepositController.text) ?? 0,
-              'brokerage': double.tryParse(_brokerageController.text) ?? 0,
-              'currentFlatmates':
-                  int.tryParse(_currentFlatmatesController.text) ?? 0,
-              'maxFlatmates': int.tryParse(_maxFlatmatesController.text) ?? 0,
-              'availableFromDate':
-                  _availableFrom != null
-                      ? DateFormat('yyyy-MM-dd').format(_availableFrom!)
-                      : '',
-              'selectedPlan': selectedPlan,
             });
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Room details updated!'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Hostel/PG details updated!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
-        ),
-      );
-      Navigator.pop(context, {'updated': true});
+        );
+        Navigator.pop(context, {'updated': true});
+      }
     }
   }
 
@@ -346,6 +357,52 @@ class _EditPropertyPageState extends State<EditPropertyPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildRoomTypesSection() {
+    return _buildSectionCard(
+      title: 'Available Room Types',
+      subtitle: 'Select room types you offer',
+      icon: Icons.bed_rounded,
+      children: [
+        Column(
+          children:
+              _availableRoomTypes.entries.map((entry) {
+                final roomType = entry.key;
+                final isSelected = entry.value;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: CheckboxListTile(
+                    value: isSelected,
+                    onChanged: (value) {
+                      setState(() {
+                        _availableRoomTypes[roomType] = value ?? false;
+                      });
+                    },
+                    title: Text(
+                      roomType,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    activeColor: const Color(0xFF4A9EFF),
+                    checkColor: Colors.white,
+                    fillColor: MaterialStateProperty.resolveWith<Color>(
+                      (states) =>
+                          states.contains(MaterialState.selected)
+                              ? const Color(0xFF4A9EFF)
+                              : Colors.transparent,
+                    ),
+                    side: const BorderSide(color: Colors.white, width: 1),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                );
+              }).toList(),
+        ),
+      ],
     );
   }
 
@@ -498,7 +555,7 @@ class _EditPropertyPageState extends State<EditPropertyPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Edit Room Details',
+          'Edit Hostel/PG Details',
           style: TextStyle(
             color: Colors.white,
             fontSize: 20,
@@ -517,7 +574,7 @@ class _EditPropertyPageState extends State<EditPropertyPage> {
               // Basic Details Section
               _buildSectionCard(
                 title: 'Basic Details',
-                subtitle: 'Room title and availability',
+                subtitle: 'Hostel title and availability',
                 icon: Icons.home_rounded,
                 children: [
                   _buildTextField(
@@ -530,12 +587,15 @@ class _EditPropertyPageState extends State<EditPropertyPage> {
                                 ? 'Enter listing title'
                                 : null,
                   ),
+                  // Modified Available From field - now shows blank initially
                   _buildTextField(
                     controller: TextEditingController(
                       text:
-                          _availableFrom != null
-                              ? DateFormat('yyyy-MM-dd').format(_availableFrom!)
-                              : '',
+                          _availableFromDate != null
+                              ? DateFormat(
+                                'yyyy-MM-dd',
+                              ).format(_availableFromDate!)
+                              : '', // This will be empty initially
                     ),
                     label: 'Available From',
                     icon: Icons.date_range_rounded,
@@ -550,73 +610,28 @@ class _EditPropertyPageState extends State<EditPropertyPage> {
                 ],
               ),
 
-              // Financial Details Section
+              // Pricing Section
               _buildSectionCard(
-                title: 'Financial Details',
-                subtitle: 'Rent and deposit information\n(per person)',
+                title: 'Pricing Details',
+                subtitle: 'Starting price information',
                 icon: Icons.currency_rupee_rounded,
                 children: [
                   _buildTextField(
-                    controller: _rentController,
-                    label: 'Monthly Rent (₹ per person)',
+                    controller: _startingPriceController,
+                    label: 'Room Starting at (₹)',
                     icon: Icons.currency_rupee_rounded,
                     keyboardType: TextInputType.number,
                     validator:
                         (value) =>
                             value == null || value.isEmpty
-                                ? 'Enter monthly rent'
+                                ? 'Enter starting price'
                                 : null,
-                  ),
-                  _buildTextField(
-                    controller: _securityDepositController,
-                    label: 'Security Deposit (₹ per person)',
-                    icon: Icons.lock_outline_rounded,
-                    keyboardType: TextInputType.number,
-                    validator:
-                        (value) =>
-                            value == null || value.isEmpty
-                                ? 'Enter security deposit'
-                                : null,
-                  ),
-                  _buildTextField(
-                    controller: _brokerageController,
-                    label: 'Brokerage (₹ per person)',
-                    icon: Icons.account_balance_wallet_rounded,
-                    keyboardType: TextInputType.number,
                   ),
                 ],
               ),
 
-              // Flatmate Details Section
-              _buildSectionCard(
-                title: 'Flatmate Details',
-                subtitle: 'Current and maximum occupancy',
-                icon: Icons.people_alt_rounded,
-                children: [
-                  _buildTextField(
-                    controller: _currentFlatmatesController,
-                    label: 'Current Flatmates',
-                    icon: Icons.people_alt_rounded,
-                    keyboardType: TextInputType.number,
-                    validator:
-                        (value) =>
-                            value == null || value.isEmpty
-                                ? 'Enter current number of flatmates'
-                                : null,
-                  ),
-                  _buildTextField(
-                    controller: _maxFlatmatesController,
-                    label: 'Maximum Flatmates',
-                    icon: Icons.group_add_rounded,
-                    keyboardType: TextInputType.number,
-                    validator:
-                        (value) =>
-                            value == null || value.isEmpty
-                                ? 'Enter maximum number of flatmates'
-                                : null,
-                  ),
-                ],
-              ),
+              // Room Types Section
+              _buildRoomTypesSection(),
 
               // Payment Plan Section
               _buildPaymentPlanSection(),
